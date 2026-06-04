@@ -40,6 +40,7 @@ export default function ChatInterface() {
   const sessions = useChatStore((s) => s.sessions);
   const updateSessionMessages = useChatStore((s) => s.updateSessionMessages);
   const setSessionTitle = useChatStore((s) => s.setSessionTitle);
+  const setServerContext = useChatStore((s) => s.setServerContext);
   const addSession = useChatStore((s) => s.addSession);
   const switchSession = useChatStore((s) => s.switchSession);
 
@@ -61,7 +62,12 @@ export default function ChatInterface() {
     const lastAssistant = [...messages]
       .reverse()
       .find((m) => m.role === "assistant" && m.id !== ASSISTANT_ID);
-    if (!lastAssistant) return messages.length === 0 ? "empty" : "products";
+    const hasProducts = messages.some(
+      (m) => m.role === "assistant" && (m.products?.length ?? 0) > 0
+    );
+    if (!lastAssistant) {
+      return messages.length === 0 ? "empty" : hasProducts ? "products" : "empty";
+    }
     if (lastAssistant.pay_url) return "ordered";
     if (lastAssistant.delivery_quote) return "delivery";
     if (lastAssistant.products?.length) return "products";
@@ -134,7 +140,8 @@ export default function ChatInterface() {
       if (session?.title === "New chat" || session?.title === "") {
         setSessionTitle(
           activeSessionId,
-          text.trim().slice(0, 32) + (text.length > 32 ? "…" : "")
+          text.trim().slice(0, 32) +
+            (text.trim().length > 32 ? "…" : "")
         );
       }
 
@@ -163,6 +170,13 @@ export default function ChatInterface() {
       if (mode === "auto") {
         setMode(effectiveMode);
       }
+
+      const historyMessages = (session?.messages ?? [])
+        .filter((m) => m.id !== ASSISTANT_ID && m.content.trim())
+        .map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
 
       try {
         await chatStream(
@@ -234,6 +248,9 @@ export default function ChatInterface() {
                   : friendly,
               }));
             },
+            onSessionContext: (ctx) => {
+              setServerContext(activeSessionId, ctx);
+            },
             onDone: () => {
               setIsLoading(false);
               setStreamStatus(undefined);
@@ -246,7 +263,11 @@ export default function ChatInterface() {
               );
             },
           },
-          abortRef.current.signal
+          abortRef.current.signal,
+          {
+            messages: historyMessages,
+            context: session?.serverContext,
+          }
         );
       } catch {
         updateAssistant((m) => ({
@@ -270,6 +291,7 @@ export default function ChatInterface() {
       updateAssistant,
       updateSessionMessages,
       setSessionTitle,
+      setServerContext,
     ]
   );
 
@@ -311,7 +333,7 @@ export default function ChatInterface() {
       <ChatTabs onNewChat={handleNewChat} onSwitch={handleSwitchTab} />
       {!backendOk && (
         <div className="bg-[#2a1f00] border-b border-[#f59e0b]/40 text-[#f59e0b] text-center text-sm py-2 px-4">
-          Kapruka is offline — start the API on port 3001.
+          Cannot reach the API. Run pnpm dev in frontend, or check GROQ_API_KEY on Vercel.
         </div>
       )}
       {cartToast && (

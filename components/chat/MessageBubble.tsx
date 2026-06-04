@@ -34,10 +34,10 @@ export default function MessageBubble({
       className={`animate-fade-in-up flex ${isUser ? "justify-end" : "justify-start"}`}
     >
       <div
-        className={`max-w-[92%] w-full sm:max-w-[85%] ${
+        className={`${
           isUser
-            ? "bg-[#e65100] text-white rounded-2xl rounded-br-md px-4 py-3"
-            : "bg-[#1a1a1a] border border-[#2e2e2e] text-[#f0f0f0] rounded-2xl rounded-bl-md px-4 py-3"
+            ? "max-w-[75%] bg-[#e65100] text-white rounded-2xl rounded-br-sm px-4 py-3 shadow-sm shadow-[#e65100]/20"
+            : "max-w-[92%] w-full sm:max-w-[88%] bg-[#1a1a1a] border border-[#2e2e2e] border-l-2 border-l-[#e65100]/50 text-[#f0f0f0] rounded-2xl rounded-bl-sm px-4 py-3.5"
         }`}
       >
         {displayContent && (
@@ -57,7 +57,7 @@ export default function MessageBubble({
                 key={chip}
                 type="button"
                 onClick={() => onSendChip(chip)}
-                className="px-3 py-1.5 rounded-full text-xs bg-[#242424] border border-[#e65100]/50 text-[#f0f0f0] hover:bg-[#e65100]/20 transition-colors"
+                className="px-3 py-1.5 rounded-full text-xs bg-transparent border border-[#e65100]/60 text-[#f0f0f0] hover:bg-[#e65100] hover:border-[#e65100] transition-colors animate-chip-pop"
               >
                 {chip}
               </button>

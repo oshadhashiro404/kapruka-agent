@@ -124,6 +124,24 @@
   animation: scale-in 0.45s ease-out forwards;
 }
 
+@keyframes chip-pop {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  60% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-chip-pop {
+  animation: chip-pop 0.2s ease-out forwards;
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;

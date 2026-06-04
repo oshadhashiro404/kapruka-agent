@@ -6,11 +6,10 @@ import type {
   OrderTracking,
   Product,
 } from "./types";
+import { getApiBase } from "./api-base";
+import type { SessionContext } from "./types";
 import type { StreamChatCallbacks } from "./sse";
 import { streamChat } from "./sse";
-
-const BASE =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 
 async function parseError(res: Response): Promise<string> {
   try {
@@ -26,13 +25,13 @@ export async function checkHealth(): Promise<{
   mcp: string;
   groq: string;
 }> {
-  const res = await fetch(`${BASE}/api/health`, { cache: "no-store" });
+  const res = await fetch(`${getApiBase()}/api/health`, { cache: "no-store" });
   if (!res.ok) throw new Error("Backend offline");
   return res.json();
 }
 
 export async function getCategories(): Promise<KaprukaCategory[]> {
-  const res = await fetch(`${BASE}/api/categories`, { method: "POST" });
+  const res = await fetch(`${getApiBase()}/api/categories`, { method: "POST" });
   if (!res.ok) throw new Error(await parseError(res));
   const data = (await res.json()) as { categories: KaprukaCategory[] };
   return data.categories;
@@ -46,7 +45,7 @@ export async function searchProducts(params: {
   sort?: string;
   limit?: number;
 }): Promise<{ products: Product[]; cursor?: string }> {
-  const res = await fetch(`${BASE}/api/search`, {
+  const res = await fetch(`${getApiBase()}/api/search`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
@@ -68,7 +67,7 @@ export async function quoteDelivery(
   date: string,
   productCode: string
 ): Promise<DeliveryQuote> {
-  const res = await fetch(`${BASE}/api/delivery/quote`, {
+  const res = await fetch(`${getApiBase()}/api/delivery/quote`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ city, date, product_code: productCode }),
@@ -89,7 +88,7 @@ export async function quoteDelivery(
 export async function trackOrder(
   orderNumber: string
 ): Promise<OrderTracking> {
-  const res = await fetch(`${BASE}/api/order/track`, {
+  const res = await fetch(`${getApiBase()}/api/order/track`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ order_number: orderNumber }),
@@ -105,10 +104,21 @@ export function chatStream(
   cart: CartItem[],
   mode: ChatMode,
   callbacks: StreamChatCallbacks,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: {
+    messages?: Array<{ role: "user" | "assistant"; content: string }>;
+    context?: SessionContext;
+  }
 ): Promise<void> {
   return streamChat(
-    { message, session_id: sessionId, cart, mode },
+    {
+      message,
+      session_id: sessionId,
+      cart,
+      mode,
+      messages: options?.messages,
+      context: options?.context,
+    },
     callbacks,
     signal
   );

@@ -1,13 +1,12 @@
+import { getApiBase } from "./api-base";
 import type {
   CartItem,
   ChatMode,
   DeliveryQuote,
   Product,
+  SessionContext,
   SseEvent,
 } from "./types";
-
-const BASE =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 
 export interface StreamChatCallbacks {
   onText: (content: string) => void;
@@ -25,6 +24,7 @@ export interface StreamChatCallbacks {
   onCartUpdate: (cart: CartItem[]) => void;
   onStatus?: (message: string) => void;
   onChips?: (items: string[]) => void;
+  onSessionContext?: (context: SessionContext) => void;
   onError: (message: string) => void;
   onDone: () => void;
 }
@@ -58,6 +58,9 @@ function dispatchEvent(event: SseEvent, callbacks: StreamChatCallbacks): void {
       break;
     case "chips":
       callbacks.onChips?.(event.items);
+      break;
+    case "session_context":
+      callbacks.onSessionContext?.(event.context);
       break;
     case "error":
       callbacks.onError(event.message);
@@ -102,13 +105,15 @@ export async function streamChat(
     session_id: string;
     cart: CartItem[];
     mode: ChatMode;
+    messages?: Array<{ role: "user" | "assistant"; content: string }>;
+    context?: SessionContext;
   },
   callbacks: StreamChatCallbacks,
   signal?: AbortSignal
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(`${BASE}/api/chat`, {
+    res = await fetch(`${getApiBase()}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

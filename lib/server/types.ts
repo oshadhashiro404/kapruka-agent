@@ -1,3 +1,5 @@
+/** Server-side types for Kapruka API routes */
+
 export interface Product {
   id: string;
   name: string;
@@ -35,28 +37,12 @@ export interface DeliveryQuote {
   perishable_warning?: string;
 }
 
-export type ChatMode = "gift" | "shopping" | "auto";
-
 export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
+  role: "user" | "model";
   content: string;
   products?: Product[];
-  chips?: string[];
-  delivery_quote?: DeliveryQuote;
-  pay_url?: string;
-  order_id?: string;
-  expires_in?: number;
-  perishable_warning?: string;
-  perishable_alternatives?: Product[];
-  timestamp: Date | string;
+  timestamp: Date;
 }
-
-export type ConversationState =
-  | "empty"
-  | "products"
-  | "delivery"
-  | "ordered";
 
 export interface SessionContext {
   lastSearchQuery?: string;
@@ -69,12 +55,43 @@ export interface SessionContext {
   pendingDeliveryDate?: string;
 }
 
-export interface ChatSession {
+export interface Session {
   id: string;
-  title: string;
   messages: ChatMessage[];
-  serverContext?: SessionContext;
-  createdAt: number;
+  cart: CartItem[];
+  mode: "gift" | "shopping" | "auto";
+  context: SessionContext;
+  created_at: Date;
+  last_active: Date;
+}
+
+export interface ClientChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface KaprukaCategory {
+  name: string;
+  url: string;
+  product_count: number;
+}
+
+export interface KaprukaCity {
+  city_code: string;
+  name: string;
+  aliases?: string[];
+}
+
+export interface McpProductHit {
+  id: string;
+  name: string;
+  price?: number;
+  price_lkr?: number;
+  image_url?: string;
+  category?: string;
+  in_stock?: boolean;
+  url?: string;
+  is_perishable?: boolean;
 }
 
 export type SseEvent =
@@ -99,22 +116,16 @@ export type SseEvent =
   | { type: "error"; message: string }
   | { type: "done" };
 
-export interface KaprukaCategory {
-  name: string;
-  url: string;
-  product_count: number;
+export type ChatMode = "gift" | "shopping" | "auto";
+
+export interface OrderCreatedResult {
+  order_id: string;
+  pay_url: string;
+  total_lkr: number;
+  estimated_arrival: string;
 }
 
-export interface OccasionTile {
-  id: string;
-  emoji: string;
-  label: string;
-  labelSinhala: string;
-  message: string;
-  category: string;
-}
-
-export interface OrderTracking {
+export interface OrderTrackResult {
   status: string;
   recipient?: string;
   items?: unknown[];

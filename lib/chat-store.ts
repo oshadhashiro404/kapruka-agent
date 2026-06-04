@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { ChatMessage, ChatSession } from "./types";
+import type { ChatMessage, ChatSession, SessionContext } from "./types";
 import { generateId } from "./utils";
 
 const HEALTH_CACHE_KEY = "kapruka-health";
@@ -40,6 +40,7 @@ interface ChatState {
     updater: (messages: ChatMessage[]) => ChatMessage[]
   ) => void;
   setSessionTitle: (sessionId: string, title: string) => void;
+  setServerContext: (sessionId: string, context: SessionContext) => void;
 }
 
 const initialSession = createEmptySession();
@@ -113,6 +114,14 @@ export const useChatStore = create<ChatState>()(
         set((state) => ({
           sessions: state.sessions.map((s) =>
             s.id === sessionId ? { ...s, title } : s
+          ),
+        }));
+      },
+
+      setServerContext: (sessionId, context) => {
+        set((state) => ({
+          sessions: state.sessions.map((s) =>
+            s.id === sessionId ? { ...s, serverContext: context } : s
           ),
         }));
       },

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useCartStore } from "@/lib/cart-store";
+import { formatLKR } from "@/lib/utils";
 
 interface HeaderProps {
   onCartClick: () => void;
@@ -9,6 +10,7 @@ interface HeaderProps {
 
 export default function Header({ onCartClick }: HeaderProps) {
   const itemCount = useCartStore((s) => s.itemCount());
+  const totalLkr = useCartStore((s) => s.totalLkr());
   const prevCount = useRef(itemCount);
   const [badgePulse, setBadgePulse] = useState(false);
 
@@ -25,7 +27,7 @@ export default function Header({ onCartClick }: HeaderProps) {
   return (
     <header className="shrink-0 flex items-center justify-between px-4 py-3 bg-[#1a1a1a] border-b border-[#2e2e2e]">
       <div>
-        <h1 className="text-lg font-bold text-[#e65100] leading-tight tracking-tight">
+        <h1 className="text-lg font-bold bg-gradient-to-r from-[#e65100] to-[#ff8f4e] bg-clip-text text-transparent leading-tight tracking-tight">
           Kapruka
         </h1>
         <p className="font-sinhala text-[10px] text-[#8a8a8a]">කප්රුකා</p>
@@ -40,13 +42,18 @@ export default function Header({ onCartClick }: HeaderProps) {
       >
         <span>Cart</span>
         {itemCount > 0 && (
-          <span
-            className={`min-w-[20px] h-5 flex items-center justify-center rounded-full bg-[#e65100] text-white text-xs font-bold px-1 ${
-              badgePulse ? "animate-scale-in" : ""
-            }`}
-          >
-            {itemCount}
-          </span>
+          <>
+            <span className="text-xs text-[#8a8a8a] hidden sm:inline">
+              {formatLKR(totalLkr)}
+            </span>
+            <span
+              className={`min-w-[20px] h-5 flex items-center justify-center rounded-full bg-[#e65100] text-white text-xs font-bold px-1 ${
+                badgePulse ? "animate-scale-in" : ""
+              }`}
+            >
+              {itemCount}
+            </span>
+          </>
         )}
       </button>
     </header>

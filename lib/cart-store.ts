@@ -132,6 +132,7 @@ export const useCartStore = create<CartState>()(
       name: "kapruwa-cart",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
+        items: state.items,
         session_id: state.session_id,
         mode: state.mode,
       }),

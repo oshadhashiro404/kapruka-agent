@@ -58,9 +58,20 @@ export default function ProductCarousel({
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="w-full py-2 text-sm text-[#8a8a8a] hover:text-[#e65100] transition-colors"
+          className="w-full flex items-center justify-center gap-1.5 py-2.5 text-sm text-[#8a8a8a] hover:text-[#e65100] border border-[#2e2e2e] rounded-xl hover:border-[#e65100]/40 transition-colors"
         >
-          Show {unique.length - MAX_VISIBLE} more
+          <span>Show {unique.length - MAX_VISIBLE} more</span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
         </button>
       )}
     </div>

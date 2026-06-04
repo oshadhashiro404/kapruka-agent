@@ -1,15 +1,47 @@
 import type { Product } from "./types";
 
+/** Kapruka CDN blocks hotlinking — serve via same-origin proxy with Referer */
+export function productImageSrc(url: string | undefined): string {
+  if (!url?.startsWith("http")) return "";
+  try {
+    const host = new URL(url).hostname;
+    if (host === "kapruka.com" || host.endsWith(".kapruka.com")) {
+      return `/api/product-image?url=${encodeURIComponent(url)}`;
+    }
+  } catch {
+    return "";
+  }
+  return url;
+}
+
+/** Prefer the richer record when the same product id appears twice (e.g. after image enrich). */
+function mergeProductEntry(prev: Product, next: Product): Product {
+  return {
+    ...prev,
+    ...next,
+    id: next.id || prev.id,
+    name: next.name && next.name !== "undefined" ? next.name : prev.name,
+    price_lkr: next.price_lkr > 0 ? next.price_lkr : prev.price_lkr,
+    image_url: next.image_url || prev.image_url,
+    images: next.images?.length ? next.images : prev.images,
+    url:
+      next.url && next.url !== "https://www.kapruka.com" ? next.url : prev.url,
+    in_stock: next.in_stock ?? prev.in_stock,
+    is_perishable: next.is_perishable ?? prev.is_perishable,
+    category: next.category || prev.category,
+    variants: next.variants ?? prev.variants,
+  };
+}
+
 /** Merge product lists from multiple SSE events without duplicate React keys */
 export function dedupeProducts(products: Product[]): Product[] {
-  const seen = new Set<string>();
-  const out: Product[] = [];
+  const byId = new Map<string, Product>();
   for (const p of products) {
-    if (!p.id || seen.has(p.id)) continue;
-    seen.add(p.id);
-    out.push(p);
+    if (!p.id) continue;
+    const prev = byId.get(p.id);
+    byId.set(p.id, prev ? mergeProductEntry(prev, p) : p);
   }
-  return out;
+  return [...byId.values()];
 }
 
 export function generateId(): string {

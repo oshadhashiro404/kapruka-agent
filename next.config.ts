@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["groq-sdk"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "www.kapruka.com", pathname: "/**" },

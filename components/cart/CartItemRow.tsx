@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import type { CartItem } from "@/lib/types";
-import { formatLKR } from "@/lib/utils";
+import { formatLKR, productImageSrc } from "@/lib/utils";
 import { useCartStore } from "@/lib/cart-store";
 
 interface CartItemRowProps {
@@ -14,7 +14,9 @@ export default function CartItemRow({ item, onEditGift }: CartItemRowProps) {
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
 
-  const img = item.product.image_url || item.product.images?.[0];
+  const img = productImageSrc(
+    item.product.image_url || item.product.images?.[0] || ""
+  );
 
   return (
     <div className="flex gap-3 py-3 border-b border-[#2e2e2e] last:border-0">
