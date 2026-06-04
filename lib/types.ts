@@ -105,6 +105,20 @@ export interface KaprukaCategory {
   product_count: number;
 }
 
+export interface KaprukaCity {
+  city_code: string;
+  name: string;
+  aliases?: string[];
+}
+
+export interface CreateOrderResult {
+  order_id: string;
+  pay_url: string;
+  total_lkr: number;
+  estimated_arrival: string;
+  expires_in: number;
+}
+
 export interface OccasionTile {
   id: string;
   emoji: string;

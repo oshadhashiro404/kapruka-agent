@@ -4,6 +4,10 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { CartItem, ChatMode, Product } from "./types";
 import { generateId } from "./utils";
+import {
+  createUserScopedStorage,
+  migrateLegacyUserStorage,
+} from "./user-id";
 
 interface CartState {
   items: CartItem[];
@@ -31,6 +35,7 @@ interface CartState {
   totalLkr: () => number;
   itemCount: () => number;
   ensureSessionId: () => string;
+  syncSessionId: (chatSessionId: string) => void;
 }
 
 export const useCartStore = create<CartState>()(
@@ -127,16 +132,23 @@ export const useCartStore = create<CartState>()(
         set({ session_id: id });
         return id;
       },
+
+      syncSessionId: (chatSessionId) => {
+        if (chatSessionId && get().session_id !== chatSessionId) {
+          set({ session_id: chatSessionId });
+        }
+      },
     }),
     {
-      name: "kapruwa-cart",
-      storage: createJSONStorage(() => localStorage),
+      name: "kapruka-cart",
+      storage: createJSONStorage(() => createUserScopedStorage()),
       partialize: (state) => ({
         items: state.items,
         session_id: state.session_id,
         mode: state.mode,
       }),
       onRehydrateStorage: () => (state) => {
+        migrateLegacyUserStorage();
         if (state && (!state.session_id || state.session_id.length === 0)) {
           state.session_id = generateId();
         }

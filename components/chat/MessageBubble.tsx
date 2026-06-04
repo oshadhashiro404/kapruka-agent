@@ -4,25 +4,40 @@ import DeliveryCard from "@/components/delivery/DeliveryCard";
 import PerishableWarning from "@/components/delivery/PerishableWarning";
 import PayButton from "@/components/checkout/PayButton";
 import ProductCarousel from "@/components/products/ProductCarousel";
-import type { ChatMessage, Product } from "@/lib/types";
+import type { ChatMessage, Product, SessionContext } from "@/lib/types";
 import { stripJsonFromDisplay } from "@/lib/utils";
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  sessionContext?: SessionContext;
   onView: (product: Product) => void;
   onAdd: (product: Product) => void;
   onSendChip?: (message: string) => void;
+  onProductsAppend?: (messageId: string, products: Product[]) => void;
 }
 
 function isSinhala(text: string): boolean {
   return /[\u0D80-\u0DFF]/.test(text);
 }
 
+function KaprukaMark() {
+  return (
+    <span
+      className="inline-flex w-6 h-6 rounded-full bg-primary/20 items-center justify-center text-[10px] font-bold text-primary shrink-0"
+      aria-hidden
+    >
+      K
+    </span>
+  );
+}
+
 export default function MessageBubble({
   message,
+  sessionContext,
   onView,
   onAdd,
   onSendChip,
+  onProductsAppend,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const displayContent = isUser
@@ -36,10 +51,19 @@ export default function MessageBubble({
       <div
         className={`${
           isUser
-            ? "max-w-[75%] bg-[#e65100] text-white rounded-2xl rounded-br-sm px-4 py-3 shadow-sm shadow-[#e65100]/20"
-            : "max-w-[92%] w-full sm:max-w-[88%] bg-[#1a1a1a] border border-[#2e2e2e] border-l-2 border-l-[#e65100]/50 text-[#f0f0f0] rounded-2xl rounded-bl-sm px-4 py-3.5"
+            ? "max-w-[85%] sm:max-w-[75%] bg-primary text-white rounded-2xl rounded-br-sm px-4 py-3 shadow-sm shadow-primary/20"
+            : "max-w-full w-full bg-surface border border-border border-l-2 border-l-primary/50 text-foreground rounded-2xl rounded-bl-sm px-4 py-3.5"
         }`}
       >
+        {!isUser && (
+          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border/60">
+            <KaprukaMark />
+            <span className="text-xs font-medium text-muted">
+              Shopping assistant
+            </span>
+          </div>
+        )}
+
         {displayContent && (
           <p
             className={`text-[15px] leading-relaxed whitespace-pre-wrap ${
@@ -57,7 +81,7 @@ export default function MessageBubble({
                 key={chip}
                 type="button"
                 onClick={() => onSendChip(chip)}
-                className="px-3 py-1.5 rounded-full text-xs bg-transparent border border-[#e65100]/60 text-[#f0f0f0] hover:bg-[#e65100] hover:border-[#e65100] transition-colors animate-chip-pop"
+                className="px-3 py-1.5 rounded-full text-xs bg-transparent border border-primary/60 text-foreground hover:bg-primary hover:border-primary transition-colors animate-chip-pop focus:outline-none focus:ring-2 focus:ring-primary/40"
               >
                 {chip}
               </button>
@@ -66,11 +90,15 @@ export default function MessageBubble({
         )}
 
         {!isUser && message.products && message.products.length > 0 && (
-          <div className="mt-3 space-y-2">
+          <div className="mt-3">
             <ProductCarousel
               products={message.products}
               onView={onView}
               onAdd={onAdd}
+              searchQuery={sessionContext?.lastSearchQuery}
+              onLoadMore={(newProducts) =>
+                onProductsAppend?.(message.id, newProducts)
+              }
             />
           </div>
         )}

@@ -19,8 +19,8 @@ export default function CartItemRow({ item, onEditGift }: CartItemRowProps) {
   );
 
   return (
-    <div className="flex gap-3 py-3 border-b border-[#2e2e2e] last:border-0">
-      <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-[#242424] shrink-0">
+    <div className="flex gap-3 py-3 border-b border-border last:border-0">
+      <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-elevated shrink-0">
         {img && (
           <Image
             src={img}
@@ -32,46 +32,46 @@ export default function CartItemRow({ item, onEditGift }: CartItemRowProps) {
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <h4 className="font-medium text-sm text-[#f0f0f0] line-clamp-2">
+        <h4 className="font-medium text-sm text-foreground line-clamp-2">
           {item.product.name}
         </h4>
         {item.selected_variant && (
-          <p className="text-xs text-[#8a8a8a]">{item.selected_variant}</p>
+          <p className="text-xs text-muted">{item.selected_variant}</p>
         )}
         {item.is_gift && (
           <button
             type="button"
             onClick={onEditGift}
-            className="text-xs text-[#e65100] mt-0.5 hover:underline"
+            className="text-xs text-primary mt-0.5 hover:underline"
           >
             {item.gift_message ? "Edit gift message" : "Add gift message"}
           </button>
         )}
-        <p className="text-[#e65100] font-semibold text-sm mt-1">
+        <p className="text-primary font-semibold text-sm mt-1">
           {formatLKR(item.product.price_lkr * item.quantity)}
         </p>
         <div className="flex items-center gap-2 mt-2">
           <button
             type="button"
             onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-            className="w-7 h-7 rounded-lg border border-[#2e2e2e] bg-[#242424] text-[#f0f0f0] text-sm"
+            className="w-7 h-7 rounded-lg border border-border bg-elevated text-foreground text-sm"
           >
             −
           </button>
-          <span className="text-sm text-[#f0f0f0] w-5 text-center">
+          <span className="text-sm text-foreground w-5 text-center">
             {item.quantity}
           </span>
           <button
             type="button"
             onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-            className="w-7 h-7 rounded-lg border border-[#2e2e2e] bg-[#242424] text-[#f0f0f0] text-sm"
+            className="w-7 h-7 rounded-lg border border-border bg-elevated text-foreground text-sm"
           >
             +
           </button>
           <button
             type="button"
             onClick={() => removeItem(item.product.id)}
-            className="ml-auto text-xs text-red-400 hover:text-red-300"
+            className="ml-auto text-xs text-danger hover:opacity-80"
           >
             Remove
           </button>

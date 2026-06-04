@@ -38,22 +38,20 @@ export default function PayButton({
   }, [expiresIn]);
 
   return (
-    <div className="rounded-xl border border-[#22c55e]/30 bg-[#0d1f0d] p-4 mt-3">
-      <h4 className="font-semibold text-[#22c55e]">Order ready</h4>
-      <p className="font-sinhala text-xs text-[#8a8a8a] mt-0.5">ඇණවුම සූදානම්</p>
-      <p className="text-sm text-[#8a8a8a] mt-2">
-        Order <span className="font-mono text-[#f0f0f0]">#{orderId}</span>
+    <div className="rounded-xl border border-success/30 bg-[var(--pay-bg)] p-4 mt-3">
+      <h4 className="font-semibold text-success">Order ready</h4>
+      <p className="font-sinhala text-xs text-muted mt-0.5">ඇණවුම සූදානම්</p>
+      <p className="text-sm text-muted mt-2">
+        Order <span className="font-mono text-foreground">#{orderId}</span>
       </p>
       <p className="text-sm mt-1">
-        <span className="text-[#8a8a8a]">Total:</span>{" "}
-        <span className="font-semibold text-[#e65100]">
+        <span className="text-muted">Total:</span>{" "}
+        <span className="font-semibold text-primary">
           {formatLKR(displayTotal)}
         </span>
       </p>
       <p
-        className={`text-xs mt-2 ${
-          urgent ? "text-red-400" : "text-[#8a8a8a]"
-        }`}
+        className={`text-xs mt-2 ${urgent ? "text-danger" : "text-muted"}`}
       >
         Expires in {formatCountdown(seconds)}
       </p>
@@ -61,15 +59,15 @@ export default function PayButton({
         type="button"
         onClick={() => window.open(payUrl, "_blank", "noopener,noreferrer")}
         disabled={seconds <= 0}
-        className={`w-full mt-4 py-3.5 rounded-xl text-white font-bold transition-all ${
+        className={`w-full mt-4 py-3.5 rounded-xl text-white font-bold transition-all focus:outline-none focus:ring-2 focus:ring-success/50 ${
           urgent
-            ? "bg-red-600 animate-pay-pulse"
-            : "bg-[#22c55e] hover:opacity-90"
+            ? "bg-danger animate-pay-pulse"
+            : "bg-success hover:opacity-90"
         } disabled:opacity-40 disabled:cursor-not-allowed`}
       >
         PAY NOW / දැන් ගෙවන්න
       </button>
-      <p className="text-[10px] text-center text-[#8a8a8a] mt-2">
+      <p className="text-[10px] text-center text-muted mt-2">
         Opens Kapruka secure checkout
       </p>
     </div>

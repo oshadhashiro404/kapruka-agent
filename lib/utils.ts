@@ -14,16 +14,32 @@ export function productImageSrc(url: string | undefined): string {
   return url;
 }
 
+function normalizeProductId(id: string): string {
+  return id.trim();
+}
+
+function bestImageUrl(...candidates: (string | undefined)[]): string {
+  for (const u of candidates) {
+    if (u?.startsWith("http")) return u;
+  }
+  return "";
+}
+
+function bestImages(a: string[] | undefined, b: string[] | undefined): string[] {
+  const merged = [...(b ?? []), ...(a ?? [])].filter((u) => u?.startsWith("http"));
+  return [...new Set(merged)];
+}
+
 /** Prefer the richer record when the same product id appears twice (e.g. after image enrich). */
 function mergeProductEntry(prev: Product, next: Product): Product {
   return {
     ...prev,
     ...next,
-    id: next.id || prev.id,
+    id: normalizeProductId(next.id || prev.id),
     name: next.name && next.name !== "undefined" ? next.name : prev.name,
     price_lkr: next.price_lkr > 0 ? next.price_lkr : prev.price_lkr,
-    image_url: next.image_url || prev.image_url,
-    images: next.images?.length ? next.images : prev.images,
+    image_url: bestImageUrl(prev.image_url, next.image_url),
+    images: bestImages(prev.images, next.images),
     url:
       next.url && next.url !== "https://www.kapruka.com" ? next.url : prev.url,
     in_stock: next.in_stock ?? prev.in_stock,
@@ -37,11 +53,38 @@ function mergeProductEntry(prev: Product, next: Product): Product {
 export function dedupeProducts(products: Product[]): Product[] {
   const byId = new Map<string, Product>();
   for (const p of products) {
-    if (!p.id) continue;
-    const prev = byId.get(p.id);
-    byId.set(p.id, prev ? mergeProductEntry(prev, p) : p);
+    const id = normalizeProductId(p.id);
+    if (!id) continue;
+    const prev = byId.get(id);
+    byId.set(id, prev ? mergeProductEntry(prev, { ...p, id }) : { ...p, id });
   }
   return [...byId.values()];
+}
+
+/** Merge streamed product batches (e.g. enrich refresh replaces prior rows). */
+export function mergeProductUpdates(
+  existing: Product[],
+  incoming: Product[]
+): Product[] {
+  if (!incoming.length) return existing;
+  if (!existing.length) return dedupeProducts(incoming);
+
+  const existingIds = new Set(
+    existing.map((p) => normalizeProductId(p.id)).filter(Boolean)
+  );
+  const incomingIds = new Set(
+    incoming.map((p) => normalizeProductId(p.id)).filter(Boolean)
+  );
+  const isEnrichRefresh =
+    incomingIds.size > 0 &&
+    existingIds.size > 0 &&
+    incoming.length >= existing.length &&
+    [...existingIds].every((id) => incomingIds.has(id));
+
+  if (isEnrichRefresh) {
+    return dedupeProducts(incoming);
+  }
+  return dedupeProducts([...existing, ...incoming]);
 }
 
 export function generateId(): string {
@@ -77,7 +120,7 @@ export function formatCountdown(seconds: number): string {
 
 /** Strip fenced JSON / API error blobs from assistant message text */
 export function stripJsonFromDisplay(text: string): string {
-  let out = text
+  const out = text
     .replace(/```(?:json)?\s*\{[\s\S]*?\}```/gi, "")
     .replace(/<function[^>]*>[\s\S]*?(<\/function>|$)/gi, "")
     .replace(/\n{3,}/g, "\n\n")

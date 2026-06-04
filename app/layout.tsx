@@ -14,9 +14,9 @@ const notoSinhala = Noto_Sans_Sinhala({
 });
 
 export const metadata: Metadata = {
-  title: "Kapruka — Smart Shopping Assistant",
+  title: "Kapruka — Chat Shopping",
   description:
-    "Chat-first shopping on Kapruka — gifts, cakes, flowers, electronics, and more.",
+    "Shop Kapruka through a beautiful full-screen chat — search gifts, cakes, flowers, electronics, check delivery, and checkout across Sri Lanka.",
 };
 
 export default function RootLayout({
@@ -29,7 +29,7 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${notoSinhala.variable} h-full antialiased`}
     >
-      <body className="h-full flex flex-col bg-[#0f0f0f] text-[#f0f0f0]">
+      <body className="h-full flex flex-col bg-bg text-foreground">
         {children}
       </body>
     </html>

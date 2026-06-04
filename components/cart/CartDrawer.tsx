@@ -10,12 +10,14 @@ interface CartDrawerProps {
   open: boolean;
   onClose: () => void;
   onCheckout: () => void;
+  onOpenWizard: () => void;
 }
 
 export default function CartDrawer({
   open,
   onClose,
   onCheckout,
+  onOpenWizard,
 }: CartDrawerProps) {
   const items = useCartStore((s) => s.items);
   const setGiftMessage = useCartStore((s) => s.setGiftMessage);
@@ -25,25 +27,25 @@ export default function CartDrawer({
     <>
       {open && (
         <div
-          className="fixed inset-0 bg-black/60 z-40"
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
           onClick={onClose}
           aria-hidden
         />
       )}
       <div
-        className={`fixed right-0 top-0 h-full w-full sm:w-[380px] bg-[#1a1a1a] border-l border-[#2e2e2e] z-50 flex flex-col transition-transform duration-300 ease-out ${
+        className={`lg:hidden fixed right-0 top-0 h-full w-full sm:w-[380px] bg-surface border-l border-border z-50 flex flex-col transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between px-4 py-4 border-b border-[#2e2e2e] bg-[#242424]">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-border bg-elevated">
           <div>
-            <h2 className="font-semibold text-[#f0f0f0]">Your cart</h2>
-            <p className="font-sinhala text-xs text-[#8a8a8a]">කරත්තය</p>
+            <h2 className="font-semibold text-foreground">Your cart</h2>
+            <p className="font-sinhala text-xs text-muted">කරත්තය</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full text-[#8a8a8a] hover:text-[#f0f0f0] hover:bg-[#2e2e2e] text-xl"
+            className="w-9 h-9 rounded-full text-muted hover:text-foreground hover:bg-border text-xl"
             aria-label="Close cart"
           >
             ×
@@ -51,12 +53,12 @@ export default function CartDrawer({
         </div>
         <div className="flex-1 overflow-y-auto px-4">
           {items.length === 0 ? (
-            <p className="text-center text-[#8a8a8a] py-12 text-sm leading-relaxed">
+            <p className="text-center text-muted py-12 text-sm leading-relaxed">
               Your cart is empty.
               <br />
               <span className="font-sinhala">කරත්ත හිස්.</span>
               <br />
-              <span className="text-[#f0f0f0] mt-2 block">
+              <span className="text-foreground mt-2 block">
                 Ask Kapruka in chat to find and add items.
               </span>
             </p>
@@ -74,7 +76,23 @@ export default function CartDrawer({
             ))
           )}
         </div>
-        {items.length > 0 && <CartSummary onCheckout={onCheckout} />}
+        {items.length > 0 && (
+          <div className="shrink-0 border-t border-border">
+            <div className="px-4 pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenWizard();
+                }}
+                className="w-full py-3 rounded-xl bg-primary text-white font-semibold hover:bg-primary-hover transition-colors mb-2"
+              >
+                Continue to checkout
+              </button>
+            </div>
+            <CartSummary onCheckout={onCheckout} />
+          </div>
+        )}
       </div>
       {giftProductId && (
         <SinhalaHelper

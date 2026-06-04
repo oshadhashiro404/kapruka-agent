@@ -1,26 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --bg-base: #0f0f0f;
-  --bg-surface: #1a1a1a;
-  --bg-elevated: #242424;
-  --border: #2e2e2e;
-  --text-primary: #f0f0f0;
-  --text-muted: #8a8a8a;
+  --bg-base: #0c0b0a;
+  --bg-surface: #161412;
+  --bg-elevated: #1f1c19;
+  --border: #2d2824;
+  --text-primary: #f8f4ef;
+  --text-muted: #a89f94;
   --accent: #e65100;
-  --accent-soft: #ff8f4e;
-  --success: #22c55e;
-  --warning: #f59e0b;
+  --accent-hover: #ff7a2e;
+  --accent-soft: rgba(230, 81, 0, 0.25);
+  --success: #2dd4a0;
+  --warning: #f5b942;
+  --danger: #ef4444;
+  --pay-bg: #0d1a14;
 }
 
 @theme inline {
   --color-background: var(--bg-base);
   --color-foreground: var(--text-primary);
   --color-primary: var(--accent);
+  --color-primary-hover: var(--accent-hover);
   --color-secondary: var(--bg-surface);
-  --color-accent: var(--accent-soft);
+  --color-accent: var(--accent-hover);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-danger: var(--danger);
   --color-bg: var(--bg-base);
   --color-surface: var(--bg-surface);
   --color-elevated: var(--bg-elevated);
@@ -79,10 +84,10 @@
 @keyframes pay-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.35);
+    box-shadow: 0 0 0 0 rgba(45, 212, 160, 0.35);
   }
   50% {
-    box-shadow: 0 0 0 12px rgba(34, 197, 94, 0);
+    box-shadow: 0 0 0 12px rgba(45, 212, 160, 0);
   }
 }
 
@@ -93,6 +98,20 @@
   }
   50% {
     transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes chip-pop {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  60% {
+    transform: scale(1.04);
   }
   100% {
     transform: scale(1);
@@ -124,22 +143,20 @@
   animation: scale-in 0.45s ease-out forwards;
 }
 
-@keyframes chip-pop {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  60% {
-    transform: scale(1.04);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
 .animate-chip-pop {
   animation: chip-pop 0.2s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-dot-bounce,
+  .animate-fade-in-up,
+  .animate-slide-in-right,
+  .animate-tab-enter,
+  .animate-pay-pulse,
+  .animate-scale-in,
+  .animate-chip-pop {
+    animation: none;
+  }
 }
 
 .scrollbar-hide {

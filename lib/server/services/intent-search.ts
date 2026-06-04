@@ -88,7 +88,7 @@ export function buildSearchParams(intent: ShoppingIntent): {
 export async function runIntentSearch(
   intent: ShoppingIntent
 ): Promise<Product[]> {
-  let params = buildSearchParams(intent);
+  const params = buildSearchParams(intent);
   let { products } = await searchProducts(params);
 
   if (products.length === 0 && (params.min_price || params.max_price)) {

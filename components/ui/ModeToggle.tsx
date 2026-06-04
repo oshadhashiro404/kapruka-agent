@@ -12,20 +12,24 @@ export default function ModeToggle() {
     { value: "shopping", label: "Shopping", icon: "🛍️" },
   ];
 
+  const active = mode === "gift" || mode === "shopping" ? mode : "shopping";
+
   return (
-    <div className="flex rounded-full bg-white/80 border border-orange-200 p-0.5 shadow-sm">
+    <div className="flex rounded-full bg-elevated border border-border p-0.5">
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
           onClick={() => setMode(opt.value)}
-          className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all ${
-            mode === opt.value
-              ? "bg-primary text-white shadow"
-              : "text-gray-600 hover:text-primary"
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+            active === opt.value
+              ? "bg-primary text-white shadow-sm"
+              : "text-muted hover:text-foreground"
           }`}
         >
-          <span className="mr-1">{opt.icon}</span>
+          <span className="mr-1" aria-hidden>
+            {opt.icon}
+          </span>
           {opt.label}
         </button>
       ))}

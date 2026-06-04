@@ -4,7 +4,11 @@ import { useState } from "react";
 import { trackOrder } from "@/lib/api";
 import type { OrderTracking } from "@/lib/types";
 
-export default function OrderTracker() {
+interface OrderTrackerProps {
+  compact?: boolean;
+}
+
+export default function OrderTracker({ compact }: OrderTrackerProps) {
   const [orderNumber, setOrderNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [tracking, setTracking] = useState<OrderTracking | null>(null);
@@ -26,40 +30,53 @@ export default function OrderTracker() {
   };
 
   return (
-    <div className="rounded-xl border border-secondary/20 bg-white p-4 shadow-sm">
-      <h4 className="font-bold text-secondary mb-2">Track your order</h4>
-      <div className="flex gap-2">
+    <div
+      className={`rounded-xl border border-border bg-elevated ${
+        compact ? "p-3" : "p-4"
+      }`}
+    >
+      <h4
+        className={`font-semibold text-foreground ${compact ? "text-sm" : ""}`}
+      >
+        Track order
+      </h4>
+      {!compact && (
+        <p className="font-sinhala text-xs text-muted mt-0.5">ඇණවුම ලුහුබඳින්න</p>
+      )}
+      <div className={`flex gap-2 ${compact ? "mt-2" : "mt-3"}`}>
         <input
           type="text"
           value={orderNumber}
           onChange={(e) => setOrderNumber(e.target.value)}
-          placeholder="Order number e.g. KAP-12345"
-          className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          onKeyDown={(e) => e.key === "Enter" && handleTrack()}
+          placeholder="KAP-12345"
+          className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
         <button
           type="button"
           onClick={handleTrack}
           disabled={loading}
-          className="px-4 py-2 rounded-lg bg-secondary text-white text-sm font-medium disabled:opacity-50"
+          className="px-3 py-2 rounded-lg bg-primary text-white text-sm font-medium disabled:opacity-50 hover:bg-primary-hover transition-colors"
         >
-          {loading ? "…" : "Track"}
+          {loading ? "…" : "Go"}
         </button>
       </div>
-      {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+      {error && <p className="text-danger text-xs mt-2">{error}</p>}
       {tracking && (
-        <div className="mt-3 text-sm space-y-2">
+        <div className="mt-3 text-xs sm:text-sm space-y-1 text-muted">
           <p>
-            <span className="font-semibold">Status:</span> {tracking.status}
+            <span className="text-foreground font-medium">Status:</span>{" "}
+            {tracking.status}
           </p>
           {tracking.recipient && (
             <p>
-              <span className="font-semibold">Recipient:</span>{" "}
+              <span className="text-foreground font-medium">Recipient:</span>{" "}
               {tracking.recipient}
             </p>
           )}
           {tracking.delivery_progress &&
             tracking.delivery_progress.length > 0 && (
-              <ul className="list-disc pl-5 text-gray-600">
+              <ul className="list-disc pl-4 pt-1">
                 {tracking.delivery_progress.map((step, i) => (
                   <li key={i}>
                     {step.status}

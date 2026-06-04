@@ -13,6 +13,8 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000). API routes are same-origin (`/api/chat`, `/api/health`, etc.).
 
+**Chat history:** Each browser gets a stable `kapruka-user-id`; sessions are saved under that id in localStorage and synced to `frontend/.data/chat-history/` via `/api/users/chat-history` (for local dev; use a durable store on serverless production).
+
 Do **not** set `NEXT_PUBLIC_BACKEND_URL` unless you still run the legacy Express server on port 3001.
 
 ## Deploy to Vercel (Hobby)
@@ -24,7 +26,7 @@ Do **not** set `NEXT_PUBLIC_BACKEND_URL` unless you still run the legacy Express
    - `MCP_ENDPOINT` (optional)
 3. Deploy.
 
-**Hobby limits:** `/api/chat` has `maxDuration: 10` seconds. Browse/search uses a fast-path without Groq when possible. Complex checkout flows may timeout on free tier.
+**Hobby limits:** `/api/chat` has `maxDuration: 10` seconds. Browse/search uses a fast-path without Groq when possible. Complex checkout flows may timeout on free tier — use the in-app **Checkout wizard** (`/api/order/create`) for reliable pay links without the full Groq tool loop.
 
 ## API routes
 
@@ -35,7 +37,10 @@ Do **not** set `NEXT_PUBLIC_BACKEND_URL` unless you still run the legacy Express
 | POST | `/api/search` |
 | POST | `/api/categories` |
 | POST | `/api/delivery/quote` |
+| POST | `/api/delivery/cities` |
+| POST | `/api/order/create` |
 | POST | `/api/order/track` |
+| GET/POST | `/api/users/chat-history` |
 
 ## Legacy Express backend
 

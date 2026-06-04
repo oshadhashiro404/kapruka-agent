@@ -1,23 +1,39 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import AppShell from "@/components/layout/AppShell";
 import Header from "@/components/layout/Header";
+import FloatingCartBar from "@/components/layout/FloatingCartBar";
 import CartDrawer from "@/components/cart/CartDrawer";
+import CheckoutWizard from "@/components/checkout/CheckoutWizard";
 import ProductModal from "@/components/products/ProductModal";
 import VariantSelector from "@/components/products/VariantSelector";
+import CategoryNav from "@/components/ui/CategoryNav";
 import ChatMessages from "./ChatMessages";
 import ChatInput from "./ChatInput";
 import ChatTabs from "./ChatTabs";
-import { chatStream, checkHealth } from "@/lib/api";
+import { chatStream, checkHealth, getCategories } from "@/lib/api";
+import {
+  pullRemoteChatHistory,
+  scheduleChatHistorySave,
+  shouldPreferRemote,
+} from "@/lib/chat-history-sync";
 import {
   getCachedHealth,
   setCachedHealth,
   useChatStore,
 } from "@/lib/chat-store";
+import { migrateLegacyUserStorage } from "@/lib/user-id";
 import { useCartStore } from "@/lib/cart-store";
-import type { ChatMessage, ConversationState, Product } from "@/lib/types";
+import type {
+  ChatMessage,
+  ConversationState,
+  KaprukaCategory,
+  Product,
+} from "@/lib/types";
 import {
   dedupeProducts,
+  mergeProductUpdates,
   generateId,
   hasVariants,
   toUserFriendlyError,
@@ -25,14 +41,22 @@ import {
 import type { ChatMode } from "@/lib/types";
 
 const ASSISTANT_ID = "assistant-stream";
+
 export default function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [browseOpen, setBrowseOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutKey, setCheckoutKey] = useState(0);
   const [modalProduct, setModalProduct] = useState<Product | null>(null);
   const [variantProduct, setVariantProduct] = useState<Product | null>(null);
-  const [backendOk, setBackendOk] = useState(true);
+  const [backendOk, setBackendOk] = useState(
+    () => getCachedHealth() !== false
+  );
   const [cartToast, setCartToast] = useState<string | null>(null);
   const [streamStatus, setStreamStatus] = useState<string | undefined>();
+  const [categories, setCategories] = useState<KaprukaCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
   const healthCheckedRef = useRef(false);
 
@@ -45,11 +69,14 @@ export default function ChatInterface() {
   const switchSession = useChatStore((s) => s.switchSession);
 
   const mode = useCartStore((s) => s.mode);
+  const activeCategory = useCartStore((s) => s.activeCategory);
+  const setActiveCategory = useCartStore((s) => s.setActiveCategory);
   const items = useCartStore((s) => s.items);
   const setMode = useCartStore((s) => s.setMode);
   const addItem = useCartStore((s) => s.addItem);
   const setItems = useCartStore((s) => s.setItems);
   const setDeliveryCost = useCartStore((s) => s.setDeliveryCost);
+  const syncSessionId = useCartStore((s) => s.syncSessionId);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const messages: ChatMessage[] = (activeSession?.messages ?? []).map((m) => ({
@@ -75,21 +102,65 @@ export default function ChatInterface() {
   })();
 
   useEffect(() => {
-    if (healthCheckedRef.current) return;
-    healthCheckedRef.current = true;
+    if (activeSessionId) syncSessionId(activeSessionId);
+  }, [activeSessionId, syncSessionId]);
 
-    if (getCachedHealth() === true) {
-      setBackendOk(true);
+  useEffect(() => {
+    migrateLegacyUserStorage();
+
+    async function mergeRemoteHistory() {
+      const local = useChatStore.getState();
+      const remote = await pullRemoteChatHistory();
+      if (
+        remote &&
+        shouldPreferRemote(
+          local.sessions,
+          remote.sessions,
+          remote.updated_at
+        )
+      ) {
+        useChatStore.getState().hydrateFromRemote({
+          sessions: remote.sessions,
+          activeSessionId: remote.activeSessionId,
+        });
+      }
+      useChatStore.getState().setHydrated();
     }
 
+    if (useChatStore.persist.hasHydrated()) {
+      void mergeRemoteHistory();
+      return;
+    }
+
+    return useChatStore.persist.onFinishHydration(() => {
+      void mergeRemoteHistory();
+    });
+  }, []);
+
+  useEffect(() => {
+    const unsub = useChatStore.subscribe((state) => {
+      if (!state.hydrated) return;
+      scheduleChatHistorySave(state.sessions, state.activeSessionId);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]))
+      .finally(() => setCategoriesLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (healthCheckedRef.current) return;
+    healthCheckedRef.current = true;
     checkHealth()
       .then(() => {
         setBackendOk(true);
         setCachedHealth(true);
       })
-      .catch(() => {
-        setBackendOk(false);
-      });
+      .catch(() => setBackendOk(false));
   }, []);
 
   useEffect(() => {
@@ -140,8 +211,7 @@ export default function ChatInterface() {
       if (session?.title === "New chat" || session?.title === "") {
         setSessionTitle(
           activeSessionId,
-          text.trim().slice(0, 32) +
-            (text.trim().length > 32 ? "…" : "")
+          text.trim().slice(0, 32) + (text.trim().length > 32 ? "…" : "")
         );
       }
 
@@ -158,8 +228,6 @@ export default function ChatInterface() {
       setIsLoading(true);
       setStreamStatus(undefined);
 
-      let textBuffer = "";
-
       const effectiveMode: ChatMode =
         mode === "auto"
           ? /gift|present|birthday|wedding|avurudu|vesak|මල|තෑග්/i.test(text)
@@ -167,16 +235,13 @@ export default function ChatInterface() {
             : "shopping"
           : mode;
 
-      if (mode === "auto") {
-        setMode(effectiveMode);
-      }
+      if (mode === "auto") setMode(effectiveMode);
 
       const historyMessages = (session?.messages ?? [])
         .filter((m) => m.id !== ASSISTANT_ID && m.content.trim())
-        .map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      let textBuffer = "";
 
       try {
         await chatStream(
@@ -199,18 +264,12 @@ export default function ChatInterface() {
               setCachedHealth(true);
               updateAssistant((m) => ({
                 ...m,
-                products: dedupeProducts([
-                  ...(m.products ?? []),
-                  ...productItems,
-                ]),
+                products: mergeProductUpdates(m.products ?? [], productItems),
               }));
             },
             onDeliveryQuote: (quote) => {
               setDeliveryCost(quote.delivery_cost_lkr);
-              updateAssistant((m) => ({
-                ...m,
-                delivery_quote: quote,
-              }));
+              updateAssistant((m) => ({ ...m, delivery_quote: quote }));
             },
             onOrderCreated: (payUrl, orderId, expiresIn) => {
               updateAssistant((m) => ({
@@ -227,25 +286,16 @@ export default function ChatInterface() {
                 perishable_alternatives: alternatives,
               }));
             },
-            onCartUpdate: (cart) => {
-              setItems(cart);
-            },
-            onStatus: (message) => {
-              setStreamStatus(message);
-            },
+            onCartUpdate: (cart) => setItems(cart),
+            onStatus: (message) => setStreamStatus(message),
             onChips: (chipItems) => {
-              updateAssistant((m) => ({
-                ...m,
-                chips: chipItems,
-              }));
+              updateAssistant((m) => ({ ...m, chips: chipItems }));
             },
             onError: (message) => {
               const friendly = toUserFriendlyError(message);
               updateAssistant((m) => ({
                 ...m,
-                content: m.content?.includes(friendly)
-                  ? m.content
-                  : friendly,
+                content: m.content?.includes(friendly) ? m.content : friendly,
               }));
             },
             onSessionContext: (ctx) => {
@@ -273,8 +323,7 @@ export default function ChatInterface() {
         updateAssistant((m) => ({
           ...m,
           content:
-            m.content ||
-            "Kapruka is having a moment. Please try again.",
+            m.content || "Kapruka is having a moment. Please try again.",
         }));
         setIsLoading(false);
         setStreamStatus(undefined);
@@ -293,6 +342,18 @@ export default function ChatInterface() {
       setSessionTitle,
       setServerContext,
     ]
+  );
+
+  const handleCategorySelect = useCallback(
+    (category: string) => {
+      setActiveCategory(category);
+      if (category === "All") {
+        sendMessage("Show me popular items on Kapruka");
+      } else {
+        sendMessage(`Show me products in ${category} category`);
+      }
+    },
+    [sendMessage, setActiveCategory]
   );
 
   const handleNewChat = () => {
@@ -317,8 +378,9 @@ export default function ChatInterface() {
     }
   };
 
-  const handleCheckout = () => {
+  const handleCheckoutViaChat = () => {
     setCartOpen(false);
+    setCheckoutOpen(false);
     const summary = items
       .map((i) => `${i.quantity}x ${i.product.name} (${i.product.id})`)
       .join(", ");
@@ -327,38 +389,142 @@ export default function ChatInterface() {
     );
   };
 
+  const handleOrderComplete = useCallback(
+    ({
+      payUrl,
+      orderId,
+      expiresIn,
+      summary,
+    }: {
+      payUrl: string;
+      orderId: string;
+      expiresIn: number;
+      summary: string;
+    }) => {
+      if (!activeSessionId) return;
+      setCheckoutOpen(false);
+      const userMsg: ChatMessage = {
+        id: generateId(),
+        role: "user",
+        content: `Completed checkout wizard. ${summary}`,
+        timestamp: new Date(),
+      };
+      const assistantMsg: ChatMessage = {
+        id: generateId(),
+        role: "assistant",
+        content:
+          "Your order is ready! Pay within the next hour to confirm.",
+        pay_url: payUrl,
+        order_id: orderId,
+        expires_in: expiresIn,
+        timestamp: new Date(),
+      };
+      updateSessionMessages(activeSessionId, (prev) => [
+        ...prev,
+        userMsg,
+        assistantMsg,
+      ]);
+    },
+    [activeSessionId, updateSessionMessages]
+  );
+
+  const handleProductsAppend = useCallback(
+    (messageId: string, newProducts: Product[]) => {
+      if (!activeSessionId) return;
+      updateSessionMessages(activeSessionId, (prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                products: mergeProductUpdates(m.products ?? [], newProducts),
+              }
+            : m
+        )
+      );
+    },
+    [activeSessionId, updateSessionMessages]
+  );
+
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#0f0f0f] relative">
-      <Header onCartClick={() => setCartOpen(true)} />
-      <ChatTabs onNewChat={handleNewChat} onSwitch={handleSwitchTab} />
-      {!backendOk && (
-        <div className="bg-[#2a1f00] border-b border-[#f59e0b]/40 text-[#f59e0b] text-center text-sm py-2 px-4">
-          Cannot reach the API. Run pnpm dev in frontend, or check GROQ_API_KEY on Vercel.
-        </div>
-      )}
-      {cartToast && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-[#242424] border border-[#e65100] text-sm text-[#f0f0f0] animate-slide-in-right shadow-lg">
-          {cartToast}
-        </div>
-      )}
-      <ChatMessages
-        messages={messages}
-        isLoading={isLoading}
-        status={streamStatus}
-        onOccasionSelect={sendMessage}
-        onView={setModalProduct}
-        onAdd={handleAddProduct}
-        onSendChip={sendMessage}
-      />
-      <ChatInput
-        onSend={sendMessage}
-        disabled={isLoading}
-        conversationState={conversationState}
-      />
+    <div className="flex flex-col h-full min-h-0 bg-bg relative">
+      <AppShell
+        browseOpen={browseOpen}
+        onBrowseOpenChange={setBrowseOpen}
+        categories={categories}
+        categoriesLoading={categoriesLoading}
+        onCategorySelect={handleCategorySelect}
+        onNewChat={handleNewChat}
+        onCheckoutViaChat={handleCheckoutViaChat}
+        onOpenCheckoutWizard={() => {
+          setCartOpen(false);
+          setCheckoutKey((k) => k + 1);
+          setCheckoutOpen(true);
+        }}
+      >
+        <Header
+          onCartClick={() => setCartOpen(true)}
+          onBrowseClick={() => setBrowseOpen(true)}
+        />
+        <ChatTabs onNewChat={handleNewChat} onSwitch={handleSwitchTab} />
+        {!backendOk && (
+          <div className="bg-warning/10 border-b border-warning/40 text-warning text-center text-sm py-2 px-4">
+            Cannot reach the API. Run pnpm dev in frontend, or check GROQ_API_KEY
+            on Vercel.
+          </div>
+        )}
+        {cartToast && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-elevated border border-primary text-sm text-foreground animate-slide-in-right shadow-lg">
+            {cartToast}
+          </div>
+        )}
+        <CategoryNav
+          categories={categories}
+          active={activeCategory}
+          onSelect={handleCategorySelect}
+          loading={categoriesLoading}
+        />
+        <ChatMessages
+          messages={messages}
+          isLoading={isLoading}
+          status={streamStatus}
+          sessionContext={activeSession?.serverContext}
+          categories={categories}
+          categoriesLoading={categoriesLoading}
+          onOccasionSelect={sendMessage}
+          onCategorySelect={handleCategorySelect}
+          onView={setModalProduct}
+          onAdd={handleAddProduct}
+          onSendChip={sendMessage}
+          onProductsAppend={handleProductsAppend}
+        />
+        <FloatingCartBar onOpenCart={() => setCartOpen(true)} />
+        <ChatInput
+          onSend={sendMessage}
+          onOpenCheckout={() => {
+            setCheckoutKey((k) => k + 1);
+            setCheckoutOpen(true);
+          }}
+          disabled={isLoading}
+          conversationState={conversationState}
+        />
+      </AppShell>
+
       <CartDrawer
         open={cartOpen}
         onClose={() => setCartOpen(false)}
-        onCheckout={handleCheckout}
+        onCheckout={handleCheckoutViaChat}
+        onOpenWizard={() => {
+          setCartOpen(false);
+          setCheckoutKey((k) => k + 1);
+          setCheckoutOpen(true);
+        }}
+      />
+      <CheckoutWizard
+        key={checkoutKey}
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        sessionContext={activeSession?.serverContext}
+        onOrderComplete={handleOrderComplete}
       />
       <ProductModal
         product={modalProduct}

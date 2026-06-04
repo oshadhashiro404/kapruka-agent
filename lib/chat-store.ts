@@ -4,9 +4,14 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { ChatMessage, ChatSession, SessionContext } from "./types";
 import { generateId } from "./utils";
+import {
+  createUserScopedStorage,
+  migrateLegacyUserStorage,
+} from "./user-id";
 
 const HEALTH_CACHE_KEY = "kapruka-health";
 const HEALTH_TTL_MS = 10 * 60 * 1000;
+const CHAT_PERSIST_NAME = "kapruka-chat";
 
 function createEmptySession(): ChatSession {
   return {
@@ -30,6 +35,7 @@ function reviveMessages(messages: ChatMessage[]): ChatMessage[] {
 interface ChatState {
   sessions: ChatSession[];
   activeSessionId: string;
+  hydrated: boolean;
   getActiveSession: () => ChatSession;
   addSession: () => string;
   switchSession: (id: string) => void;
@@ -41,6 +47,11 @@ interface ChatState {
   ) => void;
   setSessionTitle: (sessionId: string, title: string) => void;
   setServerContext: (sessionId: string, context: SessionContext) => void;
+  hydrateFromRemote: (data: {
+    sessions: ChatSession[];
+    activeSessionId: string;
+  }) => void;
+  setHydrated: () => void;
 }
 
 const initialSession = createEmptySession();
@@ -50,6 +61,7 @@ export const useChatStore = create<ChatState>()(
     (set, get) => ({
       sessions: [initialSession],
       activeSessionId: initialSession.id,
+      hydrated: false,
 
       getActiveSession: () => {
         const { sessions, activeSessionId } = get();
@@ -125,15 +137,33 @@ export const useChatStore = create<ChatState>()(
           ),
         }));
       },
+
+      hydrateFromRemote: ({ sessions, activeSessionId }) => {
+        const revived = sessions.map((s) => ({
+          ...s,
+          messages: reviveMessages(s.messages ?? []),
+        }));
+        const activeOk = revived.some((s) => s.id === activeSessionId);
+        set({
+          sessions: revived.length ? revived : [createEmptySession()],
+          activeSessionId: activeOk
+            ? activeSessionId
+            : (revived[0]?.id ?? createEmptySession().id),
+          hydrated: true,
+        });
+      },
+
+      setHydrated: () => set({ hydrated: true }),
     }),
     {
-      name: "kapruka-chat",
-      storage: createJSONStorage(() => localStorage),
+      name: CHAT_PERSIST_NAME,
+      storage: createJSONStorage(() => createUserScopedStorage()),
       partialize: (state) => ({
         sessions: state.sessions,
         activeSessionId: state.activeSessionId,
       }),
       onRehydrateStorage: () => (state) => {
+        migrateLegacyUserStorage();
         if (!state) return;
         if (state.sessions.length === 0) {
           const fresh = createEmptySession();
@@ -145,6 +175,7 @@ export const useChatStore = create<ChatState>()(
         ) {
           state.activeSessionId = state.sessions[0].id;
         }
+        state.hydrated = true;
       },
     }
   )

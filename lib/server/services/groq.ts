@@ -112,14 +112,25 @@ function buildUserContext(session: Session, message: string): string {
 }
 
 function mergeProductRecord(prev: Product, next: Product): Product {
+  const imageCandidates = [
+    prev.image_url,
+    next.image_url,
+    prev.images?.[0],
+    next.images?.[0],
+  ].filter((u): u is string => Boolean(u?.startsWith("http")));
+  const images = [
+    ...new Set([...(next.images ?? []), ...(prev.images ?? [])].filter((u) =>
+      u?.startsWith("http")
+    )),
+  ];
   return {
     ...prev,
     ...next,
-    id: next.id || prev.id,
+    id: (next.id || prev.id).trim(),
     name: next.name && next.name !== "undefined" ? next.name : prev.name,
     price_lkr: next.price_lkr > 0 ? next.price_lkr : prev.price_lkr,
-    image_url: next.image_url || prev.image_url,
-    images: next.images?.length ? next.images : prev.images,
+    image_url: imageCandidates[0] ?? "",
+    images: images.length ? images : prev.images?.length ? prev.images : next.images,
     url:
       next.url && next.url !== "https://www.kapruka.com" ? next.url : prev.url,
   };
@@ -160,9 +171,7 @@ async function enrichAndEmitProducts(
 ): Promise<void> {
   if (products.length === 0) return;
 
-  // Show cards immediately; second emit adds images after kapruka_get_product
-  emit({ type: "products", items: products });
-  emit({ type: "status", message: "Getting images..." });
+  emit({ type: "status", message: "Loading product images..." });
 
   const toEnrich = products.slice(0, ENRICH_TOP_N);
   const rest = products.slice(ENRICH_TOP_N);
@@ -690,7 +699,7 @@ export async function runKapruwaChat(
     { role: "user", content: contextualMessage },
   ];
 
-  let model = selectModel(intent);
+  const model = selectModel(intent);
   let upgradedFromFast = false;
   let finalText = "";
   let textEmitted = false;
