@@ -120,6 +120,7 @@ export default function MessageBubble({
 
         {!isUser && message.pay_url && message.order_id && (
           <PayButton
+            key={`${message.order_id}-${message.expires_in ?? 3600}`}
             payUrl={message.pay_url}
             orderId={message.order_id}
             expiresIn={message.expires_in ?? 3600}

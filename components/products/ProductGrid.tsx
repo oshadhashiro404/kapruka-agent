@@ -10,24 +10,17 @@ interface ProductGridProps {
   onAdd: (product: Product) => void;
 }
 
-function GridImage({ product }: { product: Product }) {
-  const rawSrc = productImageSrc(
-    product.image_url || product.images?.[0] || ""
-  );
-  const hasImage = rawSrc.length > 0;
+function GridImage({ product, src }: { product: Product; src: string }) {
+  const hasImage = src.length > 0;
   const [imgState, setImgState] = useState<"loading" | "loaded" | "error">(
     "loading"
   );
 
   useEffect(() => {
-    setImgState("loading");
-  }, [rawSrc]);
-
-  useEffect(() => {
     if (!hasImage || imgState !== "loading") return;
     const t = setTimeout(() => setImgState("error"), 15_000);
     return () => clearTimeout(t);
-  }, [hasImage, imgState, rawSrc]);
+  }, [hasImage, imgState]);
 
   if (!hasImage || imgState === "error") {
     return (
@@ -46,7 +39,7 @@ function GridImage({ product }: { product: Product }) {
       )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={rawSrc}
+        src={src}
         alt={product.name}
         className={`w-full h-full object-cover transition-opacity duration-300 ${
           imgState === "loaded" ? "opacity-100" : "opacity-0"
@@ -69,34 +62,41 @@ export default function ProductGrid({
 
   return (
     <div className="hidden lg:grid grid-cols-2 gap-3">
-      {unique.map((p) => (
-        <article
-          key={p.id}
-          className="rounded-xl border border-border bg-elevated overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-black/20 transition-all"
-        >
-          <button type="button" onClick={() => onView(p)} className="w-full text-left">
-            <GridImage product={p} />
-            <div className="p-3">
-              <h3 className="text-sm font-medium text-foreground line-clamp-2 leading-snug">
-                {p.name}
-              </h3>
-              <p className="text-primary font-bold text-sm mt-1">
-                {p.price_lkr > 0 ? formatLKR(p.price_lkr) : "—"}
-              </p>
-            </div>
-          </button>
-          <div className="px-3 pb-3">
+      {unique.map((p) => {
+        const src = productImageSrc(p.image_url || p.images?.[0] || "");
+        return (
+          <article
+            key={p.id}
+            className="rounded-xl border border-border bg-elevated overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-black/20 transition-all"
+          >
             <button
               type="button"
-              onClick={() => onAdd(p)}
-              disabled={!p.in_stock}
-              className="w-full py-2 rounded-lg bg-primary text-white text-xs font-semibold disabled:opacity-40 hover:bg-primary-hover transition-colors"
+              onClick={() => onView(p)}
+              className="w-full text-left"
             >
-              Add to cart
+              <GridImage key={src || p.id} product={p} src={src} />
+              <div className="p-3">
+                <h3 className="text-sm font-medium text-foreground line-clamp-2 leading-snug">
+                  {p.name}
+                </h3>
+                <p className="text-primary font-bold text-sm mt-1">
+                  {p.price_lkr > 0 ? formatLKR(p.price_lkr) : "—"}
+                </p>
+              </div>
             </button>
-          </div>
-        </article>
-      ))}
+            <div className="px-3 pb-3">
+              <button
+                type="button"
+                onClick={() => onAdd(p)}
+                disabled={!p.in_stock}
+                className="w-full py-2 rounded-lg bg-primary text-white text-xs font-semibold disabled:opacity-40 hover:bg-primary-hover transition-colors"
+              >
+                Add to cart
+              </button>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }

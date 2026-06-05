@@ -12,6 +12,7 @@ export interface StreamChatCallbacks {
   onText: (content: string) => void;
   onProducts: (items: Product[]) => void;
   onDeliveryQuote: (quote: DeliveryQuote) => void;
+  onOpenCheckoutWizard?: () => void;
   onOrderCreated: (
     payUrl: string,
     orderId: string,
@@ -39,6 +40,9 @@ function dispatchEvent(event: SseEvent, callbacks: StreamChatCallbacks): void {
       break;
     case "delivery_quote":
       callbacks.onDeliveryQuote(event.quote);
+      break;
+    case "open_checkout_wizard":
+      callbacks.onOpenCheckoutWizard?.();
       break;
     case "order_created":
       callbacks.onOrderCreated(

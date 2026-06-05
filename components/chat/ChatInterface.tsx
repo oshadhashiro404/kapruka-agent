@@ -32,7 +32,6 @@ import type {
   Product,
 } from "@/lib/types";
 import {
-  dedupeProducts,
   mergeProductUpdates,
   generateId,
   hasVariants,
@@ -74,6 +73,8 @@ export default function ChatInterface() {
   const items = useCartStore((s) => s.items);
   const setMode = useCartStore((s) => s.setMode);
   const addItem = useCartStore((s) => s.addItem);
+  const removeItem = useCartStore((s) => s.removeItem);
+  const clearCart = useCartStore((s) => s.clearCart);
   const setItems = useCartStore((s) => s.setItems);
   const setDeliveryCost = useCartStore((s) => s.setDeliveryCost);
   const syncSessionId = useCartStore((s) => s.syncSessionId);
@@ -215,6 +216,66 @@ export default function ChatInterface() {
         );
       }
 
+      const lastProducts =
+        [...(session?.messages ?? [])]
+          .reverse()
+          .find((m) => (m.products?.length ?? 0) > 0)?.products ?? [];
+
+      const local = text.trim();
+      const wantsAddFirst = /\b(add|put)\b.*\b(first|1st)\b/i.test(local);
+      const wantsRemoveFirst = /\b(remove|delete)\b.*\b(first|1st)\b/i.test(local);
+      const wantsClearCart = /\bclear\b.*\bcart\b/i.test(local);
+
+      if (wantsAddFirst && lastProducts[0]) {
+        const p = lastProducts[0];
+        addItem(p, undefined, mode === "gift");
+        setCartToast(`Added ${p.name}`);
+        updateSessionMessages(activeSessionId, (prev) => [
+          ...prev.filter((m) => m.id !== ASSISTANT_ID),
+          userMsg,
+          {
+            id: generateId(),
+            role: "assistant",
+            content: `Added “${p.name}” to your cart.`,
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
+      if (wantsRemoveFirst && items[0]) {
+        const removed = items[0].product;
+        removeItem(removed.id);
+        setCartToast(`Removed ${removed.name}`);
+        updateSessionMessages(activeSessionId, (prev) => [
+          ...prev.filter((m) => m.id !== ASSISTANT_ID),
+          userMsg,
+          {
+            id: generateId(),
+            role: "assistant",
+            content: `Removed “${removed.name}” from your cart.`,
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
+      if (wantsClearCart && items.length > 0) {
+        clearCart();
+        setCartToast("Cart cleared");
+        updateSessionMessages(activeSessionId, (prev) => [
+          ...prev.filter((m) => m.id !== ASSISTANT_ID),
+          userMsg,
+          {
+            id: generateId(),
+            role: "assistant",
+            content: "Cleared your cart.",
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
       updateSessionMessages(activeSessionId, (prev) => [
         ...prev.filter((m) => m.id !== ASSISTANT_ID),
         userMsg,
@@ -270,6 +331,11 @@ export default function ChatInterface() {
             onDeliveryQuote: (quote) => {
               setDeliveryCost(quote.delivery_cost_lkr);
               updateAssistant((m) => ({ ...m, delivery_quote: quote }));
+            },
+            onOpenCheckoutWizard: () => {
+              setCartOpen(false);
+              setCheckoutKey((k) => k + 1);
+              setCheckoutOpen(true);
             },
             onOrderCreated: (payUrl, orderId, expiresIn) => {
               updateAssistant((m) => ({
@@ -335,6 +401,9 @@ export default function ChatInterface() {
       items,
       mode,
       setMode,
+      addItem,
+      removeItem,
+      clearCart,
       setItems,
       setDeliveryCost,
       updateAssistant,
@@ -494,7 +563,15 @@ export default function ChatInterface() {
           onCategorySelect={handleCategorySelect}
           onView={setModalProduct}
           onAdd={handleAddProduct}
-          onSendChip={sendMessage}
+          onSendChip={(chip) => {
+            if (/checkout|pay/i.test(chip)) {
+              setCartOpen(false);
+              setCheckoutKey((k) => k + 1);
+              setCheckoutOpen(true);
+              return;
+            }
+            sendMessage(chip);
+          }}
           onProductsAppend={handleProductsAppend}
         />
         <FloatingCartBar onOpenCart={() => setCartOpen(true)} />

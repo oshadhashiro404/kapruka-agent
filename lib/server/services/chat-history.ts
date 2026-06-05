@@ -17,9 +17,12 @@ export interface StoredChatHistory {
   updated_at: number;
 }
 
-const DATA_DIR =
-  process.env.CHAT_HISTORY_DIR ??
-  path.join(process.cwd(), ".data", "chat-history");
+const IS_SERVERLESS = Boolean(process.env.VERCEL);
+const DEFAULT_DATA_DIR = IS_SERVERLESS
+  ? path.join(process.env.TMPDIR ?? "/tmp", "chat-history")
+  : path.join(process.cwd(), ".data", "chat-history");
+
+const DATA_DIR = process.env.CHAT_HISTORY_DIR ?? DEFAULT_DATA_DIR;
 
 function safeUserId(userId: string): string {
   return userId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 128);

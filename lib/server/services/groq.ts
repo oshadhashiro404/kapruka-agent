@@ -18,6 +18,7 @@ import { patchSessionContext } from "./session";
 import {
   ALLOW_STRONG_MODEL_RETRY,
   ENRICH_TOP_N,
+  IS_SERVERLESS,
   MAX_HISTORY_MESSAGES,
   MAX_TOOL_ITERATIONS,
 } from "../vercel-config";
@@ -566,8 +567,7 @@ async function runGroqToolLoop(
   session: Session,
   messages: Groq.Chat.Completions.ChatCompletionMessageParam[],
   emit: SseEmitter,
-  model: string,
-  upgradedFromFast: boolean
+  model: string
 ): Promise<{
   finalText: string;
   toolUseFailed: boolean;
@@ -677,6 +677,24 @@ export async function runKapruwaChat(
 
   const intent = classifyIntent(session, userMessage);
 
+  // On Vercel Hobby, long multi-tool checkout flows can exceed maxDuration.
+  // Prefer the in-app checkout wizard unless the user explicitly asked to do it in chat.
+  if (
+    IS_SERVERLESS &&
+    intent.type === "checkout" &&
+    !/via chat|in chat|here in chat/i.test(userMessage)
+  ) {
+    const msg =
+      "Opening the checkout wizard for a faster, more reliable payment link.";
+    emit({ type: "open_checkout_wizard" });
+    emit({ type: "text", content: msg });
+    if (session.cart.length > 0) {
+      emit({ type: "cart_update", cart: session.cart });
+    }
+    emit({ type: "session_context", context: session.context });
+    return { reply: msg, sessionId: session.id };
+  }
+
   if (intent.extractedCity) {
     patchSessionContext(session, { deliveryCity: intent.extractedCity });
   }
@@ -700,7 +718,6 @@ export async function runKapruwaChat(
   ];
 
   const model = selectModel(intent);
-  let upgradedFromFast = false;
   let finalText = "";
   let textEmitted = false;
 
@@ -709,8 +726,7 @@ export async function runKapruwaChat(
       session,
       messages,
       emit,
-      model,
-      upgradedFromFast
+      model
     );
     finalText = loop.finalText;
 
@@ -718,16 +734,14 @@ export async function runKapruwaChat(
       ALLOW_STRONG_MODEL_RETRY &&
       loop.toolUseFailed &&
       model === MODEL_FAST &&
-      !upgradedFromFast
+      model !== MODEL_STRONG
     ) {
-      upgradedFromFast = true;
       emit({ type: "status", message: "Trying a more capable model..." });
       loop = await runGroqToolLoop(
         session,
         messages,
         emit,
-        MODEL_STRONG,
-        true
+        MODEL_STRONG
       );
       finalText = loop.finalText || finalText;
       if (loop.toolUseFailed) {

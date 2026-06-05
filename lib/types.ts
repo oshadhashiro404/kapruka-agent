@@ -82,6 +82,7 @@ export type SseEvent =
   | { type: "products"; items: Product[] }
   | { type: "cart_update"; cart: CartItem[] }
   | { type: "delivery_quote"; quote: DeliveryQuote }
+  | { type: "open_checkout_wizard" }
   | {
       type: "order_created";
       pay_url: string;

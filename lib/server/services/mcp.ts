@@ -704,14 +704,20 @@ export async function createOrder(
     cart: params.cart,
     recipient: params.recipient,
     delivery: params.delivery,
-    ...(params.sender ? { sender: params.sender } : {}),
+    // Kapruka MCP currently requires `sender` (even for guest checkout).
+    sender: params.sender ?? { name: "Kapruka Customer" },
     ...(params.gift_message ? { gift_message: params.gift_message } : {}),
     currency: params.currency ?? "LKR",
   });
   const o = raw as Record<string, unknown>;
+  const order_id = String(o.order_id ?? o.orderId ?? "");
+  const pay_url = String(o.pay_url ?? o.payUrl ?? "");
+  if (!order_id || !pay_url) {
+    throw new Error("Checkout failed. Please try the checkout wizard again.");
+  }
   return {
-    order_id: String(o.order_id ?? o.orderId ?? ""),
-    pay_url: String(o.pay_url ?? o.payUrl ?? ""),
+    order_id,
+    pay_url,
     total_lkr: Number(o.total_lkr ?? o.total ?? 0),
     estimated_arrival: String(o.estimated_arrival ?? ""),
   };
@@ -834,7 +840,9 @@ function normalizeCreateOrderArgs(
           ""
       ),
     },
-    sender: args.sender as CreateOrderInput["sender"],
+    sender:
+      (args.sender as CreateOrderInput["sender"] | undefined) ??
+      ({ name: "Kapruka Customer" } as const),
     gift_message: args.gift_message as string | undefined,
     currency: args.currency as string | undefined,
   };

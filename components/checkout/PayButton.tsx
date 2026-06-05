@@ -24,7 +24,6 @@ export default function PayButton({
   const urgent = seconds < 300;
 
   useEffect(() => {
-    setSeconds(expiresIn);
     const t = setInterval(() => {
       setSeconds((s) => {
         if (s <= 1) {
