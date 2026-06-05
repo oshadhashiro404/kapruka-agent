@@ -1,185 +1,205 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
-  --bg-base: #0c0b0a;
-  --bg-surface: #161412;
-  --bg-elevated: #1f1c19;
-  --border: #2d2824;
-  --text-primary: #f8f4ef;
-  --text-muted: #a89f94;
-  --accent: #e65100;
-  --accent-hover: #ff7a2e;
-  --accent-soft: rgba(230, 81, 0, 0.25);
-  --success: #2dd4a0;
-  --warning: #f5b942;
-  --danger: #ef4444;
-  --pay-bg: #0d1a14;
+	--bg-base: #0c0b0a;
+	--bg-surface: #161412;
+	--bg-elevated: #1f1c19;
+	--border: #2d2824;
+	--text-primary: #f8f4ef;
+	--text-muted: #a89f94;
+	--accent: #e65100;
+	--accent-hover: #ff7a2e;
+	--accent-soft: rgba(230, 81, 0, 0.25);
+	--success: #2dd4a0;
+	--warning: #f5b942;
+	--danger: #ef4444;
+	--pay-bg: #0d1a14;
 }
 
 @theme inline {
-  --color-background: var(--bg-base);
-  --color-foreground: var(--text-primary);
-  --color-primary: var(--accent);
-  --color-primary-hover: var(--accent-hover);
-  --color-secondary: var(--bg-surface);
-  --color-accent: var(--accent-hover);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-danger: var(--danger);
-  --color-bg: var(--bg-base);
-  --color-surface: var(--bg-surface);
-  --color-elevated: var(--bg-elevated);
-  --color-border: var(--border);
-  --color-muted: var(--text-muted);
-  --font-sans: var(--font-inter), "Segoe UI", sans-serif;
-  --font-sinhala: var(--font-noto-sinhala), "Noto Sans Sinhala", "Segoe UI", sans-serif;
+	--color-background: var(--bg-base);
+	--color-foreground: var(--text-primary);
+	--color-primary: var(--accent);
+	--color-primary-hover: var(--accent-hover);
+	--color-secondary: var(--bg-surface);
+	--color-accent: var(--accent-hover);
+	--color-success: var(--success);
+	--color-warning: var(--warning);
+	--color-danger: var(--danger);
+	--color-bg: var(--bg-base);
+	--color-surface: var(--bg-surface);
+	--color-elevated: var(--bg-elevated);
+	--color-border: var(--border);
+	--color-muted: var(--text-muted);
+	--font-sans: var(--font-inter), 'Segoe UI', sans-serif;
+	--font-sinhala:
+		var(--font-noto-sinhala), 'Noto Sans Sinhala', 'Segoe UI', sans-serif;
 }
 
 @keyframes dot-bounce {
-  0%,
-  80%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.4;
-  }
-  40% {
-    transform: translateY(-6px);
-    opacity: 1;
-  }
+	0%,
+	80%,
+	100% {
+		transform: translateY(0);
+		opacity: 0.4;
+	}
+	40% {
+		transform: translateY(-6px);
+		opacity: 1;
+	}
 }
 
 @keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+	from {
+		opacity: 0;
+		transform: translateY(8px) scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
 }
 
 @keyframes slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+	from {
+		opacity: 0;
+		transform: translateX(12px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
 }
 
 @keyframes tab-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+	from {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
 @keyframes pay-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(45, 212, 160, 0.35);
-  }
-  50% {
-    box-shadow: 0 0 0 12px rgba(45, 212, 160, 0);
-  }
+	0%,
+	100% {
+		box-shadow: 0 0 0 0 rgba(45, 212, 160, 0.35);
+	}
+	50% {
+		box-shadow: 0 0 0 12px rgba(45, 212, 160, 0);
+	}
 }
 
 @keyframes scale-in {
-  0% {
-    transform: scale(0.6);
-    opacity: 0.5;
-  }
-  50% {
-    transform: scale(1.15);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+	0% {
+		transform: scale(0.6);
+		opacity: 0.5;
+	}
+	50% {
+		transform: scale(1.15);
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
 }
 
 @keyframes chip-pop {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  60% {
-    transform: scale(1.04);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+	0% {
+		transform: scale(0.95);
+		opacity: 0.8;
+	}
+	60% {
+		transform: scale(1.04);
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
 }
 
 .animate-dot-bounce {
-  animation: dot-bounce 1.2s ease-in-out infinite;
+	animation: dot-bounce 1.2s ease-in-out infinite;
 }
 
 .animate-fade-in-up {
-  animation: fade-in-up 0.35s ease-out forwards;
+	animation: fade-in-up 0.35s ease-out forwards;
 }
 
 .animate-slide-in-right {
-  animation: slide-in-right 0.25s ease-out forwards;
+	animation: slide-in-right 0.25s ease-out forwards;
 }
 
 .animate-tab-enter {
-  animation: tab-enter 0.2s ease-out forwards;
+	animation: tab-enter 0.2s ease-out forwards;
 }
 
 .animate-pay-pulse {
-  animation: pay-pulse 2s ease-in-out infinite;
+	animation: pay-pulse 2s ease-in-out infinite;
 }
 
 .animate-scale-in {
-  animation: scale-in 0.45s ease-out forwards;
+	animation: scale-in 0.45s ease-out forwards;
 }
 
 .animate-chip-pop {
-  animation: chip-pop 0.2s ease-out forwards;
+	animation: chip-pop 0.2s ease-out forwards;
+}
+
+@keyframes add-burst {
+	0% {
+		transform: scale(1);
+		box-shadow: 0 0 0 0 rgba(230, 81, 0, 0.4);
+	}
+	50% {
+		transform: scale(1.05);
+		box-shadow: 0 6px 18px -6px rgba(230, 81, 0, 0.35);
+	}
+	100% {
+		transform: scale(1);
+		box-shadow: 0 0 0 0 rgba(230, 81, 0, 0);
+	}
+}
+
+.animate-add-burst {
+	animation: add-burst 360ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-dot-bounce,
-  .animate-fade-in-up,
-  .animate-slide-in-right,
-  .animate-tab-enter,
-  .animate-pay-pulse,
-  .animate-scale-in,
-  .animate-chip-pop {
-    animation: none;
-  }
+	.animate-dot-bounce,
+	.animate-fade-in-up,
+	.animate-slide-in-right,
+	.animate-tab-enter,
+	.animate-pay-pulse,
+	.animate-scale-in,
+	.animate-chip-pop {
+		animation: none;
+	}
 }
 
 .scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+	-ms-overflow-style: none;
+	scrollbar-width: none;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;
+	display: none;
 }
 
 .font-sinhala {
-  font-family: var(--font-sinhala);
+	font-family: var(--font-sinhala);
 }
 
 body {
-  background: var(--bg-base);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
+	background: var(--bg-base);
+	color: var(--text-primary);
+	font-family: var(--font-sans);
 }
 
 html,
 body {
-  height: 100%;
-  overflow: hidden;
+	height: 100%;
+	overflow: hidden;
 }
