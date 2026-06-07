@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ProductImage from "@/components/ui/ProductImage";
 import DeliveryCard from "@/components/delivery/DeliveryCard";
 import PayButton from "@/components/checkout/PayButton";
 import CityAutocomplete from "@/components/checkout/CityAutocomplete";
@@ -17,7 +18,12 @@ import {
 } from "@/lib/checkout/checkout-schema";
 import { useCartStore } from "@/lib/cart-store";
 import type { DeliveryQuote, SessionContext } from "@/lib/types";
-import { formatGiftMessageForOrder, formatLKR, selectLeadCartProduct } from "@/lib/utils";
+import {
+  formatDeliveryCost,
+  formatGiftMessageForOrder,
+  formatLKR,
+  selectLeadCartProduct,
+} from "@/lib/utils";
 
 interface CheckoutWizardProps {
   open: boolean;
@@ -32,6 +38,51 @@ interface CheckoutWizardProps {
 }
 
 const STEPS: CheckoutStep[] = ["cart", "recipient", "delivery", "confirm"];
+
+function CheckoutLineItem({
+  quantity,
+  name,
+  price,
+  imageUrl,
+  images,
+  isGift,
+  giftMessage,
+}: {
+  quantity: number;
+  name: string;
+  price: number;
+  imageUrl?: string;
+  images?: string[];
+  isGift?: boolean;
+  giftMessage?: string;
+}) {
+  return (
+    <div className="flex gap-3 py-2 border-b border-border last:border-0">
+      <ProductImage
+        name={name}
+        imageUrl={imageUrl}
+        images={images}
+        className="relative w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-elevated border border-border"
+        imgClassName="object-contain p-0.5"
+        size="sm"
+      />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-foreground line-clamp-2">
+          {quantity}× {name}
+          {isGift ? " 🎁" : ""}
+        </p>
+        {giftMessage && (
+          <p className="text-xs text-muted line-clamp-1 mt-0.5">
+            Card: {giftMessage}
+          </p>
+        )}
+      </div>
+      <span className="text-sm font-medium text-foreground shrink-0">
+        {formatLKR(price)}
+      </span>
+    </div>
+  );
+}
 
 export default function CheckoutWizard({
   open,
@@ -65,6 +116,8 @@ export default function CheckoutWizard({
   } | null>(null);
 
   const leadProductId = selectLeadCartProduct(items);
+  const deliveryCost = quote?.delivery_cost_lkr ?? 0;
+  const deliveryTotal = deliveryCost + totalLkr;
 
   const fetchQuote = async () => {
     if (!leadProductId || !city.trim() || !date) return;
@@ -78,7 +131,11 @@ export default function CheckoutWizard({
       setCityCode(q.city_code || cityCode);
       setCity(q.city);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not check delivery");
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Could not check delivery — try another city or date."
+      );
       setQuote(null);
     } finally {
       setQuoteLoading(false);
@@ -90,7 +147,7 @@ export default function CheckoutWizard({
       itemCount: items.length,
       recipient: { name, phone, address },
       delivery: { city, date },
-      hasQuote: Boolean(quote),
+      hasQuote: step === "delivery" ? Boolean(quote) : true,
     });
     if (!gate.ok) {
       setError(gate.error);
@@ -114,7 +171,9 @@ export default function CheckoutWizard({
 
   const handlePlaceOrder = async () => {
     if (!quote?.deliverable) {
-      setError("Delivery is not available for this date and city.");
+      setError(
+        "Delivery isn't available for this date — go back and pick another day."
+      );
       return;
     }
     if (orderPlaced) return;
@@ -132,7 +191,9 @@ export default function CheckoutWizard({
         date,
       },
       gift_message: (() => {
-        const giftItems = items.filter((i) => i.gift_message || i.gift_message_sinhala);
+        const giftItems = items.filter(
+          (i) => i.gift_message || i.gift_message_sinhala
+        );
         if (!giftItems.length) return undefined;
         return giftItems
           .map((i) =>
@@ -161,9 +222,9 @@ export default function CheckoutWizard({
         payUrl: result.pay_url,
         orderId: result.order_id,
         expiresIn: result.expires_in,
-        total: result.total_lkr,
+        total: result.total_lkr || deliveryTotal,
       });
-      const summary = `Order ${result.order_id} — ${formatLKR(result.total_lkr)}`;
+      const summary = `Order ${result.order_id} — ${formatLKR(result.total_lkr || deliveryTotal)}`;
       onOrderComplete({
         payUrl: result.pay_url,
         orderId: result.order_id,
@@ -172,13 +233,17 @@ export default function CheckoutWizard({
       });
       clearCart();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create order");
+      const msg =
+        e instanceof Error ? e.message : "Could not create order";
+      setError(
+        msg.includes("payment link")
+          ? msg
+          : `${msg} — check your phone number and address, then try again.`
+      );
     } finally {
       setSubmitting(false);
     }
   };
-
-  const deliveryTotal = (quote?.delivery_cost_lkr ?? 0) + totalLkr;
 
   return (
     <AccessibleDialog
@@ -193,7 +258,7 @@ export default function CheckoutWizard({
               <button
                 type="button"
                 onClick={handleBack}
-                className="flex-1 py-2.5 rounded-xl border border-border text-sm text-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm text-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 Back
               </button>
@@ -203,7 +268,7 @@ export default function CheckoutWizard({
                 type="button"
                 onClick={handleContinue}
                 disabled={step === "cart" && items.length === 0}
-                className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-hover disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-hover disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 Continue
               </button>
@@ -229,35 +294,26 @@ export default function CheckoutWizard({
       {error && <ErrorState message={error} className="mb-3" />}
 
       {step === "cart" && (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {items.length === 0 ? (
-            <p className="text-sm text-muted">Your cart is empty.</p>
+            <p className="text-sm text-muted py-4 text-center">
+              Your cart is empty — add something from chat first.
+            </p>
           ) : (
-            <>
-              {items.map((item) => (
-                <div
-                  key={`${item.product.id}-${item.selected_variant}`}
-                  className="flex justify-between items-start text-sm py-2 border-b border-border gap-2"
-                >
-                  <div className="flex-1 min-w-0">
-                    <span className="text-foreground line-clamp-2 block">
-                      {item.quantity}× {item.product.name}
-                      {item.is_gift ? " 🎁" : ""}
-                    </span>
-                    {item.gift_message && (
-                      <span className="text-xs text-muted line-clamp-1 block mt-0.5">
-                        Card: {item.gift_message}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-primary font-medium shrink-0">
-                    {formatLKR(item.product.price_lkr * item.quantity)}
-                  </span>
-                </div>
-              ))}
-            </>
+            items.map((item) => (
+              <CheckoutLineItem
+                key={`${item.product.id}-${item.selected_variant}`}
+                quantity={item.quantity}
+                name={item.product.name}
+                price={item.product.price_lkr * item.quantity}
+                imageUrl={item.product.image_url}
+                images={item.product.images}
+                isGift={item.is_gift}
+                giftMessage={item.gift_message}
+              />
+            ))
           )}
-          <p className="text-right font-bold text-foreground pt-2">
+          <p className="text-right font-semibold text-foreground pt-3 text-sm">
             Subtotal {formatLKR(totalLkr)}
           </p>
         </div>
@@ -265,6 +321,9 @@ export default function CheckoutWizard({
 
       {step === "recipient" && (
         <div className="space-y-3">
+          <p className="text-xs text-muted">
+            Who&apos;s receiving this? We&apos;ll use these details for delivery.
+          </p>
           <div>
             <label htmlFor="recipient-name" className="block text-xs text-muted mb-1">
               Recipient name
@@ -274,7 +333,7 @@ export default function CheckoutWizard({
               value={name}
               onChange={(e) => setName(e.target.value)}
               aria-invalid={Boolean(fieldErrors.name)}
-              className="w-full rounded-xl border border-border bg-elevated px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full rounded-xl border border-border bg-elevated px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             {fieldErrors.name && (
               <p className="text-xs text-danger mt-1">{fieldErrors.name}</p>
@@ -289,8 +348,9 @@ export default function CheckoutWizard({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               type="tel"
+              placeholder="07XXXXXXXX"
               aria-invalid={Boolean(fieldErrors.phone)}
-              className="w-full rounded-xl border border-border bg-elevated px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full rounded-xl border border-border bg-elevated px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             {fieldErrors.phone && (
               <p className="text-xs text-danger mt-1">{fieldErrors.phone}</p>
@@ -305,8 +365,9 @@ export default function CheckoutWizard({
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               rows={3}
+              placeholder="House no, street, area"
               aria-invalid={Boolean(fieldErrors.address)}
-              className="w-full rounded-xl border border-border bg-elevated px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full rounded-xl border border-border bg-elevated px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             {fieldErrors.address && (
               <p className="text-xs text-danger mt-1">{fieldErrors.address}</p>
@@ -317,12 +378,16 @@ export default function CheckoutWizard({
 
       {step === "delivery" && (
         <div className="space-y-3">
+          <p className="text-xs text-muted">
+            When and where should we deliver? Tap check delivery before continuing.
+          </p>
           <CityAutocomplete
             value={city}
             cityCode={cityCode}
             onChange={(c, code) => {
               setCity(c);
               setCityCode(code);
+              setQuote(null);
             }}
           />
           <div>
@@ -334,9 +399,12 @@ export default function CheckoutWizard({
               type="date"
               value={date}
               min={todayIso()}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => {
+                setDate(e.target.value);
+                setQuote(null);
+              }}
               aria-invalid={Boolean(fieldErrors.date)}
-              className="w-full rounded-xl border border-border bg-elevated px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full rounded-xl border border-border bg-elevated px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             {fieldErrors.date && (
               <p className="text-xs text-danger mt-1">{fieldErrors.date}</p>
@@ -346,7 +414,7 @@ export default function CheckoutWizard({
             type="button"
             onClick={fetchQuote}
             disabled={quoteLoading || !city.trim() || !leadProductId}
-            className="w-full py-2.5 rounded-xl border border-primary text-primary text-sm font-medium hover:bg-primary/10 disabled:opacity-40 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="w-full py-2.5 rounded-xl border border-border text-foreground text-sm font-medium hover:bg-elevated disabled:opacity-40 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             {quoteLoading ? "Checking delivery…" : "Check delivery cost"}
           </button>
@@ -359,23 +427,42 @@ export default function CheckoutWizard({
           {quote ? (
             <DeliveryCard quote={quote} />
           ) : (
-            <p className="text-sm text-muted">Check delivery in the previous step.</p>
+            <p className="text-sm text-muted">
+              Go back to the delivery step and check delivery cost first.
+            </p>
           )}
+
+          <div className="rounded-xl bg-surface border border-border p-3 space-y-2">
+            <p className="text-xs font-medium text-muted uppercase tracking-wide">
+              Order summary
+            </p>
+            {items.map((item) => (
+              <CheckoutLineItem
+                key={`confirm-${item.product.id}-${item.selected_variant}`}
+                quantity={item.quantity}
+                name={item.product.name}
+                price={item.product.price_lkr * item.quantity}
+                imageUrl={item.product.image_url}
+                images={item.product.images}
+              />
+            ))}
+          </div>
+
           {items.some((i) => i.gift_message || i.gift_message_sinhala) && (
-            <div className="rounded-xl bg-primary/5 border border-primary/20 p-3 text-sm space-y-2">
-              <p className="text-xs font-medium text-primary uppercase tracking-wide">
+            <div className="rounded-xl bg-surface border border-border p-3 text-sm space-y-2">
+              <p className="text-xs font-medium text-muted uppercase tracking-wide">
                 Gift card messages
               </p>
               {items
                 .filter((i) => i.gift_message || i.gift_message_sinhala)
                 .map((i) => (
                   <div key={`${i.product.id}-${i.selected_variant}`}>
-                    <p className="text-muted text-xs">{i.product.name}</p>
+                    <p className="text-muted text-xs line-clamp-1">{i.product.name}</p>
                     {i.gift_message && (
-                      <p className="text-foreground">{i.gift_message}</p>
+                      <p className="text-foreground text-sm">{i.gift_message}</p>
                     )}
                     {i.gift_message_sinhala && (
-                      <p className="font-sinhala text-primary/90 text-sm">
+                      <p className="font-sinhala text-muted text-sm">
                         {i.gift_message_sinhala}
                       </p>
                     )}
@@ -383,17 +470,30 @@ export default function CheckoutWizard({
                 ))}
             </div>
           )}
-          <div className="rounded-xl bg-elevated border border-border p-3 text-sm space-y-1">
+
+          <div className="rounded-xl bg-elevated border border-border p-3 text-sm space-y-1.5">
             <p>
               <span className="text-muted">To:</span> {name} · {phone}
             </p>
             <p>
               <span className="text-muted">Address:</span> {address}
             </p>
-            <p className="font-bold text-primary pt-2">
-              Total {formatLKR(deliveryTotal)}
-            </p>
+            <div className="pt-2 border-t border-border space-y-1">
+              <p className="flex justify-between">
+                <span className="text-muted">Items</span>
+                <span>{formatLKR(totalLkr)}</span>
+              </p>
+              <p className="flex justify-between">
+                <span className="text-muted">Delivery</span>
+                <span>{formatDeliveryCost(deliveryCost)}</span>
+              </p>
+              <p className="flex justify-between font-semibold text-foreground pt-1">
+                <span>Total</span>
+                <span>{formatLKR(deliveryTotal)}</span>
+              </p>
+            </div>
           </div>
+
           {payResult ? (
             <PayButton
               payUrl={payResult.payUrl}
@@ -406,9 +506,9 @@ export default function CheckoutWizard({
               type="button"
               onClick={handlePlaceOrder}
               disabled={submitting || !quote?.deliverable || orderPlaced}
-              className="w-full py-3.5 rounded-xl bg-success text-bg font-bold hover:opacity-90 disabled:opacity-40 transition-opacity focus:outline-none focus:ring-2 focus:ring-success/40"
+              className="w-full py-3.5 rounded-xl bg-success text-white font-bold hover:opacity-90 disabled:opacity-40 transition-opacity focus:outline-none focus:ring-2 focus:ring-success/40"
             >
-              {submitting ? "Creating order…" : "Place order & get pay link"}
+              {submitting ? "Creating your order…" : "Place order & get pay link"}
             </button>
           )}
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import type { DeliveryQuote } from "@/lib/types";
-import { formatDate, formatLKR } from "@/lib/utils";
+import { formatDate, formatDeliveryCost, formatLKR } from "@/lib/utils";
 
 interface DeliveryCardProps {
   quote: DeliveryQuote;
@@ -31,7 +31,7 @@ export default function DeliveryCard({ quote, loading }: DeliveryCardProps) {
         <p>
           <span>Cost:</span>{" "}
           <span className="text-primary font-semibold">
-            {formatLKR(quote.delivery_cost_lkr)}
+            {formatDeliveryCost(quote.delivery_cost_lkr)}
           </span>
         </p>
         {quote.estimated_arrival && (

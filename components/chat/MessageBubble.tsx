@@ -23,7 +23,7 @@ function isSinhala(text: string): boolean {
 function BotAvatar() {
   return (
     <span
-      className="inline-flex w-8 h-8 rounded-full bg-primary/15 border border-chat-glow/50 items-center justify-center shrink-0 shadow-[0_0_12px_-2px_rgba(157,114,255,0.5)]"
+      className="inline-flex w-8 h-8 rounded-full bg-primary/10 border border-border items-center justify-center shrink-0"
       aria-hidden
     >
       <svg
@@ -71,7 +71,7 @@ export default function MessageBubble({
         role="article"
         aria-label="Your message"
       >
-        <div className="max-w-[85%] sm:max-w-[75%] bg-chat-user text-white rounded-2xl rounded-br-sm px-4 py-3 shadow-md shadow-primary/25">
+        <div className="max-w-[85%] sm:max-w-[75%] bg-chat-user text-white rounded-2xl rounded-br-sm px-4 py-3 shadow-sm">
           {displayContent && (
             <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
               {displayContent}
@@ -90,7 +90,7 @@ export default function MessageBubble({
     >
       <div className="flex justify-start gap-2.5 items-start">
         <BotAvatar />
-        <div className="max-w-[85%] sm:max-w-[75%] bg-chat-bot border border-chat-glow/40 text-foreground rounded-2xl rounded-bl-sm px-4 py-3.5 shadow-[0_0_16px_-6px_rgba(157,114,255,0.25)]">
+        <div className="max-w-[85%] sm:max-w-[75%] bg-chat-bot border border-border text-foreground rounded-2xl rounded-bl-sm px-4 py-3.5">
           <span className="text-xs font-medium text-muted block mb-1.5">
             Kapruka shopping buddy
           </span>
@@ -112,7 +112,7 @@ export default function MessageBubble({
                   key={chip}
                   type="button"
                   onClick={() => onSendChip(chip)}
-                  className="px-3 py-1.5 rounded-full text-xs bg-transparent border border-chat-glow/50 text-foreground hover:bg-primary hover:border-primary transition-colors animate-chip-pop focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="px-3 py-1.5 rounded-full text-xs bg-elevated border border-border text-foreground hover:bg-primary hover:text-white hover:border-primary transition-colors animate-chip-pop focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {chip}
                 </button>

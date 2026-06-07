@@ -29,7 +29,7 @@ export default function RecommendationCard({
 
   return (
     <article
-      className="shrink-0 w-[152px] flex flex-col rounded-2xl bg-chat-bot border border-chat-glow/30 shadow-[0_0_20px_-8px_rgba(157,114,255,0.35)] hover:border-chat-glow/50 transition-all duration-200 overflow-hidden"
+      className="shrink-0 w-[152px] flex flex-col rounded-2xl bg-surface border border-border hover:border-primary/40 transition-all duration-200 overflow-hidden"
     >
       <button
         type="button"

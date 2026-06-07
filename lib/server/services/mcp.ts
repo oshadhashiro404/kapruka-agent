@@ -775,30 +775,143 @@ export interface CreateOrderInput {
 	currency?: string;
 }
 
-export async function createOrder(
-	params: CreateOrderInput,
-): Promise<OrderCreatedResult> {
-	const raw = await callMcpTool('kapruka_create_order', {
-		cart: params.cart,
-		recipient: params.recipient,
-		delivery: params.delivery,
-		// Kapruka MCP currently requires `sender` (even for guest checkout).
-		sender: params.sender ?? { name: 'Kapruka Customer' },
-		...(params.gift_message ? { gift_message: params.gift_message } : {}),
-		currency: params.currency ?? 'LKR',
-	});
-	const o = raw as Record<string, unknown>;
-	const order_id = String(o.order_id ?? o.orderId ?? '');
-	const pay_url = String(o.pay_url ?? o.payUrl ?? '');
-	if (!order_id || !pay_url) {
-		throw new Error('Checkout failed. Please try the checkout wizard again.');
+/** Parse kapruka_create_order markdown / mixed MCP responses */
+export function parseKaprukaOrderResult(raw: unknown): OrderCreatedResult {
+	if (typeof raw === 'string') {
+		const fromMd = parseOrderMarkdown(raw);
+		if (fromMd) return fromMd;
+		try {
+			return parseKaprukaOrderResult(JSON.parse(raw));
+		} catch {
+			// fall through
+		}
 	}
+
+	if (raw && typeof raw === 'object') {
+		const obj = raw as Record<string, unknown>;
+
+		if (typeof obj.result === 'string') {
+			const nested = parseKaprukaOrderResult(obj.result);
+			if (nested.order_id && nested.pay_url) return nested;
+		}
+
+		const order = (obj.order as Record<string, unknown>) ?? obj;
+		const order_id = String(
+			order.order_id ??
+				order.orderId ??
+				order.order_number ??
+				order.id ??
+				'',
+		).trim();
+		const pay_url = String(
+			order.pay_url ??
+				order.payUrl ??
+				order.payment_url ??
+				order.paymentUrl ??
+				order.checkout_url ??
+				'',
+		).trim();
+
+		if (order_id && pay_url) {
+			return {
+				order_id,
+				pay_url,
+				total_lkr: Number(
+					order.total_lkr ?? order.total ?? order.amount ?? 0,
+				),
+				estimated_arrival: String(
+					order.estimated_arrival ?? order.estimated_delivery ?? '',
+				),
+			};
+		}
+
+		const fromMd = parseOrderMarkdown(JSON.stringify(obj));
+		if (fromMd) return fromMd;
+	}
+
+	throw new Error(
+		'Could not get a payment link from Kapruka. Double-check delivery details and try again — or contact Kapruka support if this keeps happening.',
+	);
+}
+
+function parseOrderMarkdown(text: string): OrderCreatedResult | null {
+	const order_id =
+		text.match(/\*\*Order(?:\s+Number|\s+ID)?\*\*:\s*`?([^`\n]+)`?/i)?.[1]?.trim() ??
+		text.match(/order(?:\s+number|\s+id)?[:\s]+`?([A-Za-z0-9_-]+)`?/i)?.[1]?.trim() ??
+		text.match(/\*\*Order\*\*:\s*([A-Za-z0-9_-]+)/i)?.[1]?.trim();
+
+	const payLinkMatch =
+		text.match(/\*\*Pay(?:ment)?(?:\s+URL|\s+Link)?\*\*:\s*(https?:\/\/\S+)/i) ??
+		text.match(/\[([^\]]*(?:pay|checkout)[^\]]*)\]\((https?:\/\/[^)]+)\)/i) ??
+		text.match(/(https?:\/\/[^\s)\]"']*kapruka[^\s)\]"']*)/i);
+
+	const pay_url = (payLinkMatch?.[2] ?? payLinkMatch?.[1])
+		?.replace(/[)\],.]+$/, '')
+		.trim();
+
+	const totalMatch =
+		text.match(/\*\*Total\*\*:\s*LKR\s*([\d,]+)/i) ??
+		text.match(/total(?:\s+lkr)?[:\s]+(?:LKR\s*)?([\d,]+)/i);
+
+	const arrivalMatch = text.match(
+		/\*\*Estimated(?:\s+Arrival|\s+Delivery)?\*\*:\s*([^\n]+)/i,
+	);
+
+	if (!order_id || !pay_url) return null;
+
 	return {
 		order_id,
 		pay_url,
-		total_lkr: Number(o.total_lkr ?? o.total ?? 0),
-		estimated_arrival: String(o.estimated_arrival ?? ''),
+		total_lkr: totalMatch
+			? parseInt(totalMatch[1].replace(/,/g, ''), 10)
+			: 0,
+		estimated_arrival: arrivalMatch?.[1]?.trim() ?? '',
 	};
+}
+
+async function resolveDeliveryCityCode(city: string): Promise<string> {
+	const trimmed = city.trim();
+	if (!trimmed) return trimmed;
+	if (/^[A-Z0-9_-]{2,12}$/i.test(trimmed) && !trimmed.includes(' ')) {
+		return trimmed;
+	}
+	try {
+		const cities = await listDeliveryCities(trimmed, 5);
+		if (cities[0]?.city_code) return cities[0].city_code;
+		if (cities[0]?.name) return cities[0].name;
+	} catch {
+		// use raw city
+	}
+	return trimmed;
+}
+
+export async function createOrder(
+	params: CreateOrderInput,
+): Promise<OrderCreatedResult> {
+	const deliveryCity = await resolveDeliveryCityCode(params.delivery.city);
+	const payload = {
+		cart: params.cart,
+		recipient: params.recipient,
+		delivery: {
+			...params.delivery,
+			city: deliveryCity,
+		},
+		sender: params.sender ?? { name: params.recipient.name || 'Kapruka Customer' },
+		...(params.gift_message ? { gift_message: params.gift_message } : {}),
+		currency: params.currency ?? 'LKR',
+	};
+
+	const raw = await callMcpTool('kapruka_create_order', payload);
+
+	try {
+		return parseKaprukaOrderResult(raw);
+	} catch (err) {
+		logger.warn({ raw, err }, 'createOrder parse failed');
+		if (err instanceof Error && !err.message.includes('payment link')) {
+			throw err;
+		}
+		throw err;
+	}
 }
 
 /** Flat shape used by REST / legacy callers */

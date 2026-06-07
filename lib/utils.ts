@@ -100,6 +100,11 @@ export function formatLKR(amount: number): string {
   return `Rs ${amount.toLocaleString("en-LK", { maximumFractionDigits: 0 })}`;
 }
 
+export function formatDeliveryCost(amount: number): string {
+  if (amount <= 0) return "Free delivery";
+  return formatLKR(amount);
+}
+
 export function formatDate(dateStr: string): string {
   try {
     const d = new Date(dateStr);

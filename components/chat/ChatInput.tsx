@@ -140,13 +140,13 @@ export default function ChatInput({
             disabled={disabled}
             rows={1}
             placeholder="What are you looking for today? / අද ඔයාට ඕන දෙය මොකක්ද?"
-            className="flex-1 resize-none rounded-2xl border border-border bg-elevated text-foreground placeholder:text-muted px-4 py-3.5 text-base focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-chat-glow/30 disabled:opacity-50 min-h-[52px] max-h-24 transition-shadow shadow-[0_0_12px_-8px_rgba(157,114,255,0.2)]"
+            className="flex-1 resize-none rounded-2xl border border-border bg-elevated text-foreground placeholder:text-muted px-4 py-3.5 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 disabled:opacity-50 min-h-[52px] max-h-24 transition-shadow"
           />
           <button
             type="button"
             onClick={handleSend}
             disabled={disabled || !text.trim()}
-            className="shrink-0 w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-40 hover:bg-primary-hover active:scale-95 transition-all shadow-lg shadow-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="shrink-0 w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-40 hover:bg-primary-hover active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-primary/30"
             aria-label="Send message"
           >
             <SendIcon />

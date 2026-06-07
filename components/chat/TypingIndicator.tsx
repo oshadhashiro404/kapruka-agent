@@ -8,7 +8,7 @@ export default function TypingIndicator({ status }: TypingIndicatorProps) {
   return (
     <div className="flex justify-start gap-2.5 items-start" role="status" aria-label={status ?? "Assistant is typing"}>
       <span
-        className="inline-flex w-8 h-8 rounded-full bg-primary/15 border border-chat-glow/50 items-center justify-center shrink-0 shadow-[0_0_12px_-2px_rgba(157,114,255,0.5)]"
+        className="inline-flex w-8 h-8 rounded-full bg-primary/10 border border-border items-center justify-center shrink-0"
         aria-hidden
       >
         <svg
@@ -30,7 +30,7 @@ export default function TypingIndicator({ status }: TypingIndicatorProps) {
           <path d="M9 13v2" />
         </svg>
       </span>
-      <div className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-bl-sm bg-chat-bot border border-chat-glow/40 shadow-[0_0_16px_-6px_rgba(157,114,255,0.25)]">
+      <div className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-bl-sm bg-chat-bot border border-border">
         <div className="flex items-center gap-1.5" aria-hidden>
           {[0, 1, 2].map((i) => (
             <span
