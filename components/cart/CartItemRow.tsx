@@ -13,6 +13,8 @@ interface CartItemRowProps {
 export default function CartItemRow({ item, onEditGift }: CartItemRowProps) {
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
+  const toggleGift = useCartStore((s) => s.toggleGift);
+  const variant = item.selected_variant;
 
   const img = productImageSrc(
     item.product.image_url || item.product.images?.[0] || ""
@@ -38,11 +40,18 @@ export default function CartItemRow({ item, onEditGift }: CartItemRowProps) {
         {item.selected_variant && (
           <p className="text-xs text-muted">{item.selected_variant}</p>
         )}
-        {item.is_gift && (
+        <button
+          type="button"
+          onClick={() => toggleGift(item.product.id, variant)}
+          className="text-xs text-muted mt-0.5 hover:text-primary"
+        >
+          {item.is_gift ? "🎁 Gift" : "Make this a gift"}
+        </button>
+        {item.is_gift && onEditGift && (
           <button
             type="button"
             onClick={onEditGift}
-            className="text-xs text-primary mt-0.5 hover:underline"
+            className="text-xs text-primary mt-0.5 hover:underline block"
           >
             {item.gift_message ? "Edit gift message" : "Add gift message"}
           </button>
@@ -53,7 +62,9 @@ export default function CartItemRow({ item, onEditGift }: CartItemRowProps) {
         <div className="flex items-center gap-2 mt-2">
           <button
             type="button"
-            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+            onClick={() =>
+              updateQuantity(item.product.id, item.quantity - 1, variant)
+            }
             className="w-7 h-7 rounded-lg border border-border bg-elevated text-foreground text-sm"
           >
             −
@@ -63,14 +74,16 @@ export default function CartItemRow({ item, onEditGift }: CartItemRowProps) {
           </span>
           <button
             type="button"
-            onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+            onClick={() =>
+              updateQuantity(item.product.id, item.quantity + 1, variant)
+            }
             className="w-7 h-7 rounded-lg border border-border bg-elevated text-foreground text-sm"
           >
             +
           </button>
           <button
             type="button"
-            onClick={() => removeItem(item.product.id)}
+            onClick={() => removeItem(item.product.id, variant)}
             className="ml-auto text-xs text-danger hover:opacity-80"
           >
             Remove

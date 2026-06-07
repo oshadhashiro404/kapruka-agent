@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import ProductImage from "@/components/ui/ProductImage";
 import type { Product } from "@/lib/types";
-import { formatLKR, hasVariants, productImageSrc } from "@/lib/utils";
+import { formatLKR, hasVariants } from "@/lib/utils";
 
 interface ProductModalProps {
   product: Product | null;
@@ -21,6 +21,7 @@ export default function ProductModal({
 }: ProductModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const [enriched, setEnriched] = useState<Product | null>(null);
 
   useEffect(() => {
     if (!product) return;
@@ -60,16 +61,51 @@ export default function ProductModal({
     };
   }, [product, onClose]);
 
+  useEffect(() => {
+    if (!product) {
+      setEnriched(null);
+      return;
+    }
+    const hasImages =
+      product.image_url?.startsWith("http") ||
+      (product.images?.length ?? 0) > 0;
+    if (hasImages) {
+      setEnriched(product);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getApiBase } = await import("@/lib/api-base");
+        const res = await fetch(`${getApiBase()}/api/product`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ product_id: product.id }),
+        });
+        if (res.ok && !cancelled) {
+          const data = (await res.json()) as { product: Product };
+          setEnriched(data.product);
+        } else if (!cancelled) {
+          setEnriched(product);
+        }
+      } catch {
+        if (!cancelled) setEnriched(product);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [product]);
+
   if (!product) return null;
 
+  const display = enriched ?? product;
   const images = [
-    ...(product.images ?? []),
-    ...(product.image_url && !product.images?.includes(product.image_url)
-      ? [product.image_url]
+    ...(display.images ?? []),
+    ...(display.image_url && !display.images?.includes(display.image_url)
+      ? [display.image_url]
       : []),
-  ]
-    .map((s) => productImageSrc(s))
-    .filter((s) => s.length > 0);
+  ].filter((s) => s?.startsWith("http"));
 
   return (
     <div
@@ -104,7 +140,7 @@ export default function ProductModal({
             {images.map((src, i) => (
               <ProductImage
                 key={src + i}
-                name={`${product.name} ${i + 1}`}
+                name={`${display.name} ${i + 1}`}
                 imageUrl={src}
                 className="relative w-64 h-64 shrink-0 rounded-xl overflow-hidden bg-elevated"
               />

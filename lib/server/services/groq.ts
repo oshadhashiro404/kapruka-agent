@@ -1,6 +1,13 @@
 import Groq from "groq-sdk";
 import { KAPRUKA_SYSTEM_PROMPT } from "../config/system-prompt";
+import { buildCartChips } from "../config/product-keywords";
 import { KAPRUKA_GROQ_TOOLS } from "../config/kapruka-tools";
+import {
+  buildConciergeReply,
+  planConciergeTurn,
+  planToSearchIntent,
+  type ConciergePlan,
+} from "./concierge";
 import {
   buildIntentReply,
   classifyIntent,
@@ -8,6 +15,12 @@ import {
   shouldFastPathSearch,
   type Intent,
 } from "./intent-classifier";
+import {
+  fetchPerishableAlternatives,
+  parseDeliveryDate,
+  quoteCartDelivery,
+  selectLeadProductForQuote,
+} from "./logistics";
 import {
   executeMcpToolCall,
   getProduct,
@@ -56,6 +69,7 @@ function getGroq(): Groq {
 function selectModel(intent: Intent): string {
   if (intent.requiresCheckout) return MODEL_STRONG;
   if (intent.type === "track") return MODEL_STRONG;
+  if (intent.isNarrative) return MODEL_STRONG;
   if (intent.confidence > 0.75 && intent.type === "browse") return MODEL_FAST;
   return MODEL_FAST;
 }
@@ -319,10 +333,15 @@ async function emitStructuredSideEffects(
     emit({ type: "delivery_quote", quote });
 
     if (q.is_perishable && q.perishable_warning) {
+      const budget = session.cart[0]?.product.price_lkr;
+      const alternatives = await fetchPerishableAlternatives(
+        "gift",
+        budget
+      );
       emit({
         type: "perishable_warning",
         message: q.perishable_warning,
-        alternatives: [],
+        alternatives,
       });
     }
     return;
@@ -457,6 +476,83 @@ export function toUserFriendlyGroqError(err: unknown): {
   return { message: fallback };
 }
 
+function emitProductChips(
+  session: Session,
+  emit: SseEmitter,
+  customChips?: string[]
+): void {
+  const cartCount = session.cart.reduce((s, c) => s + c.quantity, 0);
+  const chips = customChips?.length ? customChips : buildCartChips(cartCount);
+  emit({ type: "chips", items: chips });
+}
+
+function emitGiftSuggestion(
+  plan: ConciergePlan,
+  emit: SseEmitter,
+  productId?: string
+): void {
+  if (!plan.giftMessageEn || !productId) return;
+  emit({
+    type: "gift_message_suggestion",
+    productId,
+    messageEn: plan.giftMessageEn,
+    messageSi: plan.giftMessageSi ?? undefined,
+  });
+}
+
+function cartTotals(session: Session): { count: number; total: number } {
+  const count = session.cart.reduce((s, c) => s + c.quantity, 0);
+  const total = session.cart.reduce(
+    (s, c) => s + c.product.price_lkr * c.quantity,
+    0
+  );
+  return { count, total };
+}
+
+/** Concierge path for narrative / emotional messages */
+async function tryConciergePath(
+  session: Session,
+  userMessage: string,
+  intent: Intent,
+  emit: SseEmitter
+): Promise<string | null> {
+  if (!intent.isNarrative) return null;
+
+  try {
+    emit({ type: "status", message: "Reading your story..." });
+    const plan = await planConciergeTurn(session, userMessage);
+
+    if (plan.skipSearch) {
+      const reply =
+        plan.replyOpener ??
+        "What kind of gift — flowers, cake, hamper? And a rough budget in LKR?";
+      emitProductChips(session, emit, plan.chips);
+      return reply;
+    }
+
+    const searchIntent = planToSearchIntent(
+      plan,
+      userMessage,
+      intent.extractedKeywords
+    );
+    emit({ type: "status", message: "Searching Kapruka..." });
+    const products = await runIntentSearch(searchIntent);
+    patchSessionContext(session, { lastSearchQuery: searchIntent.query });
+
+    if (products.length > 0) {
+      await enrichAndEmitProducts(products, emit, session);
+      emitGiftSuggestion(plan, emit, products[0]?.id);
+    }
+
+    const { count, total } = cartTotals(session);
+    const reply = buildConciergeReply(plan, products.length, count, total);
+    emitProductChips(session, emit, plan.chips);
+    return reply;
+  } catch {
+    return null;
+  }
+}
+
 /** Direct Kapruka search when intent classifier allows fast-path */
 async function tryFastPathSearch(
   session: Session,
@@ -474,9 +570,65 @@ async function tryFastPathSearch(
     if (products.length > 0) {
       await enrichAndEmitProducts(products, emit, session);
     }
+    emitProductChips(session, emit);
     return buildIntentReply(intent.searchIntent, products.length);
   } catch {
     return null;
+  }
+}
+
+/** Quote delivery for cart when user asks about delivery */
+async function tryDeliveryQuote(
+  session: Session,
+  userMessage: string,
+  intent: Intent,
+  emit: SseEmitter
+): Promise<string | null> {
+  if (intent.type !== "delivery_query") return null;
+
+  const city = intent.extractedCity ?? session.context?.deliveryCity;
+  const date =
+    parseDeliveryDate(userMessage) ?? session.context?.pendingDeliveryDate;
+  const lead = selectLeadProductForQuote(session.cart);
+
+  if (!city) {
+    return "Which city should I check delivery for?";
+  }
+  if (!date) {
+    return "When do you need it — today, tomorrow, or a specific date?";
+  }
+  if (!lead) {
+    return "Add something to your cart first, then I can check delivery.";
+  }
+
+  try {
+    emit({ type: "status", message: "Checking delivery..." });
+    const q = await quoteCartDelivery(city, date, lead.id);
+    patchSessionContext(session, {
+      deliveryCity: q.city,
+      deliveryCityCode: q.city_code,
+      pendingDeliveryDate: date,
+    });
+    emit({ type: "delivery_quote", quote: q });
+    if (!q.deliverable && q.is_perishable) {
+      const alternatives = await fetchPerishableAlternatives(
+        lead.category,
+        lead.price_lkr
+      );
+      emit({
+        type: "perishable_warning",
+        message:
+          q.perishable_warning ??
+          "That date may not work for this perishable item.",
+        alternatives,
+      });
+    }
+    const cost = q.delivery_cost_lkr;
+    return q.deliverable
+      ? `Delivery to ${q.city} on ${date} is Rs ${cost.toLocaleString("en-LK")} — estimated ${q.estimated_arrival}.`
+      : `Hmm, delivery to ${q.city} on ${date} isn't available for this item. Want to try another date?`;
+  } catch {
+    return "Couldn't check delivery right now — try the checkout wizard.";
   }
 }
 
@@ -495,6 +647,7 @@ async function directMcpSearchFallback(
     if (products.length > 0) {
       await enrichAndEmitProducts(products, emit, session);
     }
+    emitProductChips(session, emit);
     return buildIntentReply(si, products.length);
   } catch {
     return null;
@@ -697,6 +850,42 @@ export async function runKapruwaChat(
 
   if (intent.extractedCity) {
     patchSessionContext(session, { deliveryCity: intent.extractedCity });
+  }
+
+  const deliveryDate = parseDeliveryDate(userMessage);
+  if (deliveryDate) {
+    patchSessionContext(session, { pendingDeliveryDate: deliveryDate });
+  }
+
+  const deliveryReply = await tryDeliveryQuote(
+    session,
+    userMessage,
+    intent,
+    emit
+  );
+  if (deliveryReply) {
+    emit({ type: "text", content: deliveryReply });
+    emitProductChips(session, emit);
+    if (session.cart.length > 0) {
+      emit({ type: "cart_update", cart: session.cart });
+    }
+    emit({ type: "session_context", context: session.context });
+    return { reply: deliveryReply, sessionId: session.id };
+  }
+
+  const conciergeReply = await tryConciergePath(
+    session,
+    userMessage,
+    intent,
+    emit
+  );
+  if (conciergeReply) {
+    emit({ type: "text", content: conciergeReply });
+    if (session.cart.length > 0) {
+      emit({ type: "cart_update", cart: session.cart });
+    }
+    emit({ type: "session_context", context: session.context });
+    return { reply: conciergeReply, sessionId: session.id };
   }
 
   const fastReply = await tryFastPathSearch(session, intent, emit);

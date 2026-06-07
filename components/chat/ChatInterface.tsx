@@ -96,7 +96,11 @@ export default function ChatInterface() {
       setVariantProduct(product);
     } else {
       addItem(product, undefined, mode === "gift");
-      setCartToast(`Added ${product.name}`);
+      setCartToast(
+        mode === "gift"
+          ? `Added ${product.name} — add a gift card message from your cart`
+          : `Added ${product.name}`
+      );
     }
   };
 

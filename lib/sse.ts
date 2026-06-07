@@ -19,6 +19,11 @@ export interface StreamChatCallbacks {
 	onCartUpdate: (cart: CartItem[]) => void;
 	onStatus?: (message: string) => void;
 	onChips?: (items: string[]) => void;
+	onGiftMessageSuggestion?: (
+		productId: string,
+		messageEn: string,
+		messageSi?: string,
+	) => void;
 	onSessionContext?: (context: SessionContext) => void;
 	onError: (message: string) => void;
 	onDone: () => void;
@@ -52,6 +57,13 @@ function dispatchEvent(event: SseEvent, callbacks: StreamChatCallbacks): void {
 			break;
 		case 'chips':
 			callbacks.onChips?.(event.items);
+			break;
+		case 'gift_message_suggestion':
+			callbacks.onGiftMessageSuggestion?.(
+				event.productId,
+				event.messageEn,
+				event.messageSi,
+			);
 			break;
 		case 'session_context':
 			callbacks.onSessionContext?.(event.context);

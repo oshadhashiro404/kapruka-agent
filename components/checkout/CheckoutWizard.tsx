@@ -17,7 +17,7 @@ import {
 } from "@/lib/checkout/checkout-schema";
 import { useCartStore } from "@/lib/cart-store";
 import type { DeliveryQuote, SessionContext } from "@/lib/types";
-import { formatLKR } from "@/lib/utils";
+import { formatGiftMessageForOrder, formatLKR, selectLeadCartProduct } from "@/lib/utils";
 
 interface CheckoutWizardProps {
   open: boolean;
@@ -64,7 +64,7 @@ export default function CheckoutWizard({
     total: number;
   } | null>(null);
 
-  const leadProductId = items[0]?.product.id ?? "";
+  const leadProductId = selectLeadCartProduct(items);
 
   const fetchQuote = async () => {
     if (!leadProductId || !city.trim() || !date) return;
@@ -131,7 +131,16 @@ export default function CheckoutWizard({
         city: cityCode || city.trim(),
         date,
       },
-      gift_message: items.find((i) => i.gift_message)?.gift_message,
+      gift_message: (() => {
+        const giftItems = items.filter((i) => i.gift_message || i.gift_message_sinhala);
+        if (!giftItems.length) return undefined;
+        return giftItems
+          .map((i) =>
+            formatGiftMessageForOrder(i.gift_message, i.gift_message_sinhala)
+          )
+          .filter(Boolean)
+          .join("\n\n");
+      })(),
     };
 
     const parsed = createOrderPayloadSchema.safeParse(payload);
@@ -144,10 +153,8 @@ export default function CheckoutWizard({
     setSubmitting(true);
     setError(null);
     try {
-      const giftItem = items.find((i) => i.gift_message);
       const result = await createOrder({
         ...parsed.data,
-        gift_message: giftItem?.gift_message,
       });
       setOrderPlaced(true);
       setPayResult({
@@ -226,19 +233,29 @@ export default function CheckoutWizard({
           {items.length === 0 ? (
             <p className="text-sm text-muted">Your cart is empty.</p>
           ) : (
-            items.map((item) => (
-              <div
-                key={`${item.product.id}-${item.selected_variant}`}
-                className="flex justify-between text-sm py-2 border-b border-border"
-              >
-                <span className="text-foreground line-clamp-1 flex-1 pr-2">
-                  {item.quantity}× {item.product.name}
-                </span>
-                <span className="text-primary font-medium shrink-0">
-                  {formatLKR(item.product.price_lkr * item.quantity)}
-                </span>
-              </div>
-            ))
+            <>
+              {items.map((item) => (
+                <div
+                  key={`${item.product.id}-${item.selected_variant}`}
+                  className="flex justify-between items-start text-sm py-2 border-b border-border gap-2"
+                >
+                  <div className="flex-1 min-w-0">
+                    <span className="text-foreground line-clamp-2 block">
+                      {item.quantity}× {item.product.name}
+                      {item.is_gift ? " 🎁" : ""}
+                    </span>
+                    {item.gift_message && (
+                      <span className="text-xs text-muted line-clamp-1 block mt-0.5">
+                        Card: {item.gift_message}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-primary font-medium shrink-0">
+                    {formatLKR(item.product.price_lkr * item.quantity)}
+                  </span>
+                </div>
+              ))}
+            </>
           )}
           <p className="text-right font-bold text-foreground pt-2">
             Subtotal {formatLKR(totalLkr)}
@@ -343,6 +360,28 @@ export default function CheckoutWizard({
             <DeliveryCard quote={quote} />
           ) : (
             <p className="text-sm text-muted">Check delivery in the previous step.</p>
+          )}
+          {items.some((i) => i.gift_message || i.gift_message_sinhala) && (
+            <div className="rounded-xl bg-primary/5 border border-primary/20 p-3 text-sm space-y-2">
+              <p className="text-xs font-medium text-primary uppercase tracking-wide">
+                Gift card messages
+              </p>
+              {items
+                .filter((i) => i.gift_message || i.gift_message_sinhala)
+                .map((i) => (
+                  <div key={`${i.product.id}-${i.selected_variant}`}>
+                    <p className="text-muted text-xs">{i.product.name}</p>
+                    {i.gift_message && (
+                      <p className="text-foreground">{i.gift_message}</p>
+                    )}
+                    {i.gift_message_sinhala && (
+                      <p className="font-sinhala text-primary/90 text-sm">
+                        {i.gift_message_sinhala}
+                      </p>
+                    )}
+                  </div>
+                ))}
+            </div>
           )}
           <div className="rounded-xl bg-elevated border border-border p-3 text-sm space-y-1">
             <p>

@@ -113,6 +113,12 @@ export type SseEvent =
     }
   | { type: "status"; message: string }
   | { type: "chips"; items: string[] }
+  | {
+      type: "gift_message_suggestion";
+      productId: string;
+      messageEn: string;
+      messageSi?: string;
+    }
   | { type: "session_context"; context: SessionContext }
   | { type: "error"; message: string }
   | { type: "done" };

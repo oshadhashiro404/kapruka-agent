@@ -3,10 +3,15 @@
 import { useCallback, useRef, useState } from "react";
 import { chatStream } from "@/lib/api";
 import {
-  wantsAddFirstProduct,
+  formatCartSummary,
+  inferModeFromMessage,
+  isCheckoutChip,
+  matchCartLineByName,
+  resolveAddProducts,
+  wantsAcceptGiftMessage,
+  wantsCartSummary,
   wantsClearCart,
   wantsRemoveFirstProduct,
-  inferModeFromMessage,
 } from "@/lib/chat-intents";
 import { toUserFriendlyError } from "@/lib/errors";
 import { useChatStore } from "@/lib/chat-store";
@@ -19,6 +24,7 @@ export interface ChatStreamingCallbacks {
   onOpenCheckout: () => void;
   onCartToast: (message: string) => void;
   markHealthy: () => void;
+  onGiftMessagePrompt?: (productId: string) => void;
 }
 
 export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
@@ -34,6 +40,11 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
   const clearCart = useCartStore((s) => s.clearCart);
   const setItems = useCartStore((s) => s.setItems);
   const setDeliveryCost = useCartStore((s) => s.setDeliveryCost);
+  const setPendingGiftSuggestion = useCartStore(
+    (s) => s.setPendingGiftSuggestion
+  );
+  const setGiftMessage = useCartStore((s) => s.setGiftMessage);
+  const pendingGiftSuggestion = useCartStore((s) => s.pendingGiftSuggestion);
 
   const updateSessionMessages = useChatStore((s) => s.updateSessionMessages);
   const setServerContext = useChatStore((s) => s.setServerContext);
@@ -73,17 +84,40 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
       userMsg: ChatMessage,
       lastProducts: Product[]
     ): boolean => {
-      if (wantsAddFirstProduct(text) && lastProducts[0]) {
-        const p = lastProducts[0];
-        addItem(p, undefined, mode === "gift");
-        callbacks.onCartToast(`Added ${p.name}`);
+      if (isCheckoutChip(text)) {
+        callbacks.onOpenCheckout();
+        return true;
+      }
+
+      if (wantsCartSummary(text)) {
+        const summary = formatCartSummary(items);
         updateSessionMessages(sessionId, (prev) => [
           ...prev.filter((m) => m.id !== ASSISTANT_STREAM_ID),
           userMsg,
           {
             id: generateId(),
             role: "assistant",
-            content: `Nice pick! Added "${p.name}" to your cart.`,
+            content: summary,
+            timestamp: new Date(),
+          },
+        ]);
+        return true;
+      }
+
+      const toAdd = resolveAddProducts(text, lastProducts);
+      if (toAdd.length > 0) {
+        for (const p of toAdd) {
+          addItem(p, undefined, mode === "gift");
+        }
+        const names = toAdd.map((p) => p.name).join(" + ");
+        callbacks.onCartToast(`Added ${names}`);
+        updateSessionMessages(sessionId, (prev) => [
+          ...prev.filter((m) => m.id !== ASSISTANT_STREAM_ID),
+          userMsg,
+          {
+            id: generateId(),
+            role: "assistant",
+            content: `Nice! Added ${names} to your cart.`,
             timestamp: new Date(),
           },
         ]);
@@ -91,19 +125,62 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
       }
 
       if (wantsRemoveFirstProduct(text) && items[0]) {
-        const removed = items[0].product;
-        removeItem(removed.id);
-        callbacks.onCartToast(`Removed ${removed.name}`);
+        const removed = items[0];
+        removeItem(removed.product.id, removed.selected_variant);
+        callbacks.onCartToast(`Removed ${removed.product.name}`);
         updateSessionMessages(sessionId, (prev) => [
           ...prev.filter((m) => m.id !== ASSISTANT_STREAM_ID),
           userMsg,
           {
             id: generateId(),
             role: "assistant",
-            content: `Removed "${removed.name}" from your cart.`,
+            content: `Removed "${removed.product.name}" from your cart.`,
             timestamp: new Date(),
           },
         ]);
+        return true;
+      }
+
+      const lineToRemove = matchCartLineByName(text, items);
+      if (lineToRemove && /\b(remove|delete)\b/i.test(text)) {
+        removeItem(lineToRemove.product.id, lineToRemove.selected_variant);
+        callbacks.onCartToast(`Removed ${lineToRemove.product.name}`);
+        updateSessionMessages(sessionId, (prev) => [
+          ...prev.filter((m) => m.id !== ASSISTANT_STREAM_ID),
+          userMsg,
+          {
+            id: generateId(),
+            role: "assistant",
+            content: `Removed "${lineToRemove.product.name}" from your cart.`,
+            timestamp: new Date(),
+          },
+        ]);
+        return true;
+      }
+
+      if (wantsAcceptGiftMessage(text) && pendingGiftSuggestion) {
+        const inCart = items.find(
+          (i) => i.product.id === pendingGiftSuggestion.productId
+        );
+        if (inCart) {
+          setGiftMessage(
+            pendingGiftSuggestion.productId,
+            pendingGiftSuggestion.messageEn,
+            pendingGiftSuggestion.messageSi,
+            inCart.selected_variant
+          );
+        }
+        updateSessionMessages(sessionId, (prev) => [
+          ...prev.filter((m) => m.id !== ASSISTANT_STREAM_ID),
+          userMsg,
+          {
+            id: generateId(),
+            role: "assistant",
+            content: `Done — added your card message: "${pendingGiftSuggestion.messageEn}"`,
+            timestamp: new Date(),
+          },
+        ]);
+        setPendingGiftSuggestion(undefined);
         return true;
       }
 
@@ -133,6 +210,9 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
       mode,
       callbacks,
       updateSessionMessages,
+      pendingGiftSuggestion,
+      setGiftMessage,
+      setPendingGiftSuggestion,
     ]
   );
 
@@ -244,6 +324,24 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
             onChips: (chipItems) => {
               updateAssistant(sessionId, (m) => ({ ...m, chips: chipItems }));
             },
+            onGiftMessageSuggestion: (productId, messageEn, messageSi) => {
+              setPendingGiftSuggestion({
+                productId,
+                messageEn,
+                messageSi,
+              });
+              const inCart = useCartStore
+                .getState()
+                .items.find((i) => i.product.id === productId);
+              if (inCart) {
+                setGiftMessage(
+                  productId,
+                  messageEn,
+                  messageSi,
+                  inCart.selected_variant
+                );
+              }
+            },
             onError: (message) => {
               const friendly = toUserFriendlyError(message);
               updateAssistant(sessionId, (m) => ({
@@ -287,6 +385,8 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
       setMode,
       setItems,
       setDeliveryCost,
+      setPendingGiftSuggestion,
+      setGiftMessage,
       updateAssistant,
       updateSessionMessages,
       setServerContext,

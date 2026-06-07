@@ -1,5 +1,12 @@
 import type { Session } from "../types";
 import {
+  extractProductTerms,
+  hasSpecificKeyword,
+  isNarrativeMessage,
+  parseCategoryBrowse,
+  PRODUCT_HINTS,
+} from "../config/product-keywords";
+import {
   buildSearchParams,
   buildIntentReply,
   runIntentSearch,
@@ -14,7 +21,8 @@ export type IntentType =
   | "track"
   | "delivery_query"
   | "clarify"
-  | "chit_chat";
+  | "chit_chat"
+  | "category_browse";
 
 export interface Intent {
   type: IntentType;
@@ -22,30 +30,16 @@ export interface Intent {
   extractedBudget?: number;
   extractedCity?: string;
   extractedKeywords: string[];
+  extractedCategory?: string;
   isNegation: boolean;
   isFollowUp: boolean;
   requiresCheckout: boolean;
-  /** When fast-path search is viable */
+  skipFastPath: boolean;
+  isNarrative: boolean;
   searchIntent?: ShoppingIntent;
 }
 
-const PRODUCT_HINTS: { pattern: RegExp; term: string }[] = [
-  { pattern: /\bflowers?\b/i, term: "flowers" },
-  { pattern: /\bperfumes?\b/i, term: "perfume" },
-  { pattern: /\bchocolates?\b/i, term: "chocolate" },
-  { pattern: /\bcakes?\b/i, term: "cake" },
-  { pattern: /\bgifts?\b/i, term: "gift" },
-  { pattern: /\bjewel\w*/i, term: "jewelry" },
-  { pattern: /\bwatches?\b/i, term: "watch" },
-  { pattern: /\belectronics?\b/i, term: "electronics" },
-  { pattern: /\bclothes?\b|\bclothing\b/i, term: "clothing" },
-  { pattern: /\btoys?\b/i, term: "toy" },
-  { pattern: /\bbooks?\b/i, term: "book" },
-  { pattern: /\bbouquet\b/i, term: "bouquet" },
-  { pattern: /\broses?\b/i, term: "roses" },
-  { pattern: /\bhamper\b/i, term: "hamper" },
-  { pattern: /\bphone\b/i, term: "phone" },
-];
+export { PRODUCT_HINTS };
 
 const SL_CITIES =
   /\b(colombo|kandy|galle|jaffna|negombo|matara|kurunegala|anuradhapura|ratnapura|badulla|trincomalee|batticaloa|nugegoda|dehiwala|moratuwa|panadura)\b/i;
@@ -77,7 +71,6 @@ const CHIT =
 const BUDGET_SIGNAL =
   /(?:rs\.?\s*|lkr\s*)?(\d{1,3}(?:,\d{3})+|\d{4,7})(?:\s*(?:lkr|rs\.?))?|(?:under|around|about|budget|max)\s*(?:rs\.?\s*)?(\d+)/i;
 
-/** Vague terms — fast-path search needs a specific product keyword or a budget */
 const GENERIC_TERMS = new Set([
   "gift",
   "gifts",
@@ -86,10 +79,6 @@ const GENERIC_TERMS = new Set([
   "something",
   "item",
 ]);
-
-function hasSpecificKeyword(keywords: string[]): boolean {
-  return keywords.some((k) => !GENERIC_TERMS.has(k));
-}
 
 function parseBudgetLkr(text: string): number | undefined {
   const m = text.match(BUDGET_SIGNAL);
@@ -100,11 +89,7 @@ function parseBudgetLkr(text: string): number | undefined {
 }
 
 function extractKeywords(text: string): string[] {
-  const terms = new Set<string>();
-  for (const { pattern, term } of PRODUCT_HINTS) {
-    if (pattern.test(text)) terms.add(term);
-  }
-  return Array.from(terms);
+  return extractProductTerms(text);
 }
 
 function extractCity(text: string): string | undefined {
@@ -136,6 +121,8 @@ export function classifyIntent(
   const keywords = extractKeywords(context);
   const budget = parseBudgetLkr(context) ?? parseBudgetLkr(msg);
   const city = extractCity(msg) ?? extractCity(context);
+  const category = parseCategoryBrowse(msg);
+  const narrative = isNarrativeMessage(msg);
   const isNegation = NEGATION.test(msg) || /\bno\s+(flowers|cake|gift)/i.test(msg);
   const isFollowUp =
     FOLLOW_UP.test(msg) ||
@@ -146,7 +133,10 @@ export function classifyIntent(
   let type: IntentType = "chit_chat";
   let confidence = 0.3;
 
-  if (CHIT.test(msg) && keywords.length === 0) {
+  if (category) {
+    type = "category_browse";
+    confidence = 0.88;
+  } else if (CHIT.test(msg) && keywords.length === 0) {
     return {
       type: "chit_chat",
       confidence: 0.85,
@@ -154,6 +144,8 @@ export function classifyIntent(
       isNegation,
       isFollowUp,
       requiresCheckout: false,
+      skipFastPath: narrative,
+      isNarrative: narrative,
     };
   }
 
@@ -189,27 +181,30 @@ export function classifyIntent(
   if (isNegation) confidence = 0.2;
 
   const requiresCheckout = type === "checkout";
+  const skipFastPath = narrative;
 
   let searchIntent: ShoppingIntent | undefined;
   if (
     !isNegation &&
     !isFollowUp &&
-    keywords.length > 0 &&
+    (keywords.length > 0 || category) &&
     confidence >= 0.65 &&
-    (type === "browse" || type === "gift_search") &&
-    (budget !== undefined || hasSpecificKeyword(keywords))
+    (type === "browse" || type === "gift_search" || type === "category_browse") &&
+    (budget !== undefined || hasSpecificKeyword(keywords) || category)
   ) {
     searchIntent = {
-      query: keywords.slice(0, 4).join(" "),
+      query: category ?? keywords.slice(0, 4).join(" "),
       budgetLkr: budget,
-      labels: keywords,
+      labels: category ? [category, ...keywords] : keywords,
+      category,
     };
   }
 
   if (
     searchIntent &&
     searchIntent.labels.every((k) => GENERIC_TERMS.has(k)) &&
-    !searchIntent.budgetLkr
+    !searchIntent.budgetLkr &&
+    !category
   ) {
     searchIntent = undefined;
   }
@@ -220,18 +215,24 @@ export function classifyIntent(
     extractedBudget: budget,
     extractedCity: city,
     extractedKeywords: keywords,
+    extractedCategory: category,
     isNegation,
     isFollowUp,
     requiresCheckout,
+    skipFastPath,
+    isNarrative: narrative,
     searchIntent,
   };
 }
 
 export function shouldFastPathSearch(intent: Intent): boolean {
+  if (intent.skipFastPath) return false;
   if (!intent.searchIntent) return false;
   const si = intent.searchIntent;
   const canSearch =
-    si.budgetLkr !== undefined || hasSpecificKeyword(si.labels);
+    si.budgetLkr !== undefined ||
+    hasSpecificKeyword(si.labels) ||
+    Boolean(si.category);
   return (
     canSearch &&
     intent.confidence >= 0.65 &&

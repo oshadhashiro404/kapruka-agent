@@ -30,27 +30,41 @@ export function findCartLine(
   );
 }
 
+function lineKey(productId: string, variant?: string): string {
+  return `${productId}::${variant ?? ""}`;
+}
+
 interface CartState {
   items: CartItem[];
   session_id: string;
   mode: ChatMode;
   activeCategory: string;
   deliveryCostLkr: number;
+  pendingGiftSuggestion?: {
+    productId: string;
+    messageEn: string;
+    messageSi?: string;
+  };
   setMode: (mode: ChatMode) => void;
   setActiveCategory: (category: string) => void;
   setDeliveryCost: (cost: number) => void;
+  setPendingGiftSuggestion: (
+    suggestion: CartState["pendingGiftSuggestion"]
+  ) => void;
   addItem: (
     product: Product,
     variant?: string,
     isGift?: boolean
   ) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, qty: number) => void;
+  removeItem: (productId: string, variant?: string) => void;
+  updateQuantity: (productId: string, qty: number, variant?: string) => void;
   setGiftMessage: (
     productId: string,
     message: string,
-    sinhalaMessage?: string
+    sinhalaMessage?: string,
+    variant?: string
   ) => void;
+  toggleGift: (productId: string, variant?: string) => void;
   setItems: (items: CartItem[]) => void;
   clearCart: () => void;
   totalLkr: () => number;
@@ -67,10 +81,13 @@ export const useCartStore = create<CartState>()(
       mode: "auto",
       activeCategory: "All",
       deliveryCostLkr: 0,
+      pendingGiftSuggestion: undefined,
 
       setMode: (mode) => set({ mode }),
       setActiveCategory: (category) => set({ activeCategory: category }),
       setDeliveryCost: (cost) => set({ deliveryCostLkr: cost }),
+      setPendingGiftSuggestion: (suggestion) =>
+        set({ pendingGiftSuggestion: suggestion }),
 
       addItem: (product, variant, isGift = false) => {
         const items = [...get().items];
@@ -84,6 +101,14 @@ export const useCartStore = create<CartState>()(
             ),
           });
         } else {
+          const pending = get().pendingGiftSuggestion;
+          const giftFields =
+            pending?.productId === product.id
+              ? {
+                  gift_message: pending.messageEn,
+                  gift_message_sinhala: pending.messageSi,
+                }
+              : {};
           set({
             items: [
               ...items,
@@ -92,38 +117,55 @@ export const useCartStore = create<CartState>()(
                 quantity: 1,
                 selected_variant: variant,
                 is_gift: isGift || get().mode === "gift",
+                ...giftFields,
               },
             ],
+            pendingGiftSuggestion:
+              pending?.productId === product.id ? undefined : pending,
           });
         }
       },
 
-      removeItem: (productId) =>
+      removeItem: (productId, variant) =>
         set({
-          items: get().items.filter((i) => i.product.id !== productId),
+          items: get().items.filter(
+            (i) => lineKey(i.product.id, i.selected_variant) !== lineKey(productId, variant)
+          ),
         }),
 
-      updateQuantity: (productId, qty) => {
+      updateQuantity: (productId, qty, variant) => {
         if (qty < 1) {
-          get().removeItem(productId);
+          get().removeItem(productId, variant);
           return;
         }
         set({
           items: get().items.map((i) =>
-            i.product.id === productId ? { ...i, quantity: qty } : i
+            i.product.id === productId && i.selected_variant === variant
+              ? { ...i, quantity: qty }
+              : i
           ),
         });
       },
 
-      setGiftMessage: (productId, message, sinhalaMessage) =>
+      setGiftMessage: (productId, message, sinhalaMessage, variant) =>
         set({
           items: get().items.map((i) =>
-            i.product.id === productId
+            i.product.id === productId && i.selected_variant === variant
               ? {
                   ...i,
                   gift_message: message,
                   gift_message_sinhala: sinhalaMessage,
+                  is_gift: true,
                 }
+              : i
+          ),
+        }),
+
+      toggleGift: (productId, variant) =>
+        set({
+          items: get().items.map((i) =>
+            i.product.id === productId && i.selected_variant === variant
+              ? { ...i, is_gift: !i.is_gift }
               : i
           ),
         }),
@@ -157,6 +199,7 @@ export const useCartStore = create<CartState>()(
         items: state.items,
         session_id: state.session_id,
         mode: state.mode,
+        deliveryCostLkr: state.deliveryCostLkr,
       }),
       onRehydrateStorage: () => (state) => {
         migrateLegacyUserStorage();

@@ -2,7 +2,9 @@ import type { Product } from "./types";
 
 /** Kapruka CDN blocks hotlinking — serve via same-origin proxy with Referer */
 export function productImageSrc(url: string | undefined): string {
-  if (!url?.startsWith("http")) return "";
+  if (!url) return "";
+  if (url.startsWith("/api/product-image")) return url;
+  if (!url.startsWith("http")) return "";
   try {
     const host = new URL(url).hostname;
     if (host === "kapruka.com" || host.endsWith(".kapruka.com")) {
@@ -140,6 +142,40 @@ export { toUserFriendlyError } from "./errors";
 export function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 1)}…`;
+}
+
+const PERISHABLE_CATEGORIES = new Set([
+  "cakes",
+  "flowers",
+  "gift combos",
+  "groceries",
+  "chocolates",
+]);
+
+export function isPerishableProduct(product: {
+  is_perishable?: boolean;
+  category?: string;
+}): boolean {
+  if (product.is_perishable) return true;
+  return PERISHABLE_CATEGORIES.has(product.category?.toLowerCase() ?? "");
+}
+
+/** Pick perishable lead item for delivery quoting */
+export function selectLeadCartProduct(
+  items: { product: { id: string; is_perishable?: boolean; category?: string } }[]
+): string {
+  if (!items.length) return "";
+  const perishable = items.find((i) => isPerishableProduct(i.product));
+  return (perishable ?? items[0]).product.id;
+}
+
+export function formatGiftMessageForOrder(
+  en?: string,
+  si?: string
+): string | undefined {
+  if (!en && !si) return undefined;
+  if (en && si) return `${en}\n---\n${si}`;
+  return en ?? si;
 }
 
 export function hasVariants(product: {
