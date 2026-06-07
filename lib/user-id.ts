@@ -3,6 +3,13 @@
 import { generateId } from "./utils";
 
 const USER_ID_KEY = "kapruka-user-id";
+const MIGRATION_FLAG_KEY = "kapruka-storage-migrated";
+
+const LEGACY_KEYS = [
+  { legacy: "kapruka-chat", current: "kapruka-chat" },
+  { legacy: "kapruka-cart", current: "kapruka-cart" },
+  { legacy: "kapruwa-cart", current: "kapruka-cart" },
+] as const;
 
 /** Stable anonymous user id for this browser (persists across visits). */
 export function getOrCreateUserId(): string {
@@ -41,21 +48,27 @@ export function createUserScopedStorage(): Storage {
   };
 }
 
-const LEGACY_CHAT_KEY = "kapruka-chat";
-const LEGACY_CART_KEY = "kapruwa-cart";
-
 /** Copy pre–per-user localStorage keys into the current user's namespace once. */
 export function migrateLegacyUserStorage(): void {
   if (typeof window === "undefined") return;
   const userId = getOrCreateUserId();
 
-  const legacyChat = localStorage.getItem(LEGACY_CHAT_KEY);
-  if (legacyChat && !localStorage.getItem(`${userId}:${LEGACY_CHAT_KEY}`)) {
-    localStorage.setItem(`${userId}:${LEGACY_CHAT_KEY}`, legacyChat);
+  if (localStorage.getItem(`${userId}:${MIGRATION_FLAG_KEY}`) === "1") {
+    return;
   }
 
-  const legacyCart = localStorage.getItem(LEGACY_CART_KEY);
-  if (legacyCart && !localStorage.getItem(`${userId}:${LEGACY_CART_KEY}`)) {
-    localStorage.setItem(`${userId}:${LEGACY_CART_KEY}`, legacyCart);
+  let migrated = false;
+  for (const { legacy, current } of LEGACY_KEYS) {
+    const legacyValue = localStorage.getItem(legacy);
+    const scopedKey = `${userId}:${current}`;
+    if (legacyValue && !localStorage.getItem(scopedKey)) {
+      localStorage.setItem(scopedKey, legacyValue);
+      migrated = true;
+    }
+  }
+
+  localStorage.setItem(`${userId}:${MIGRATION_FLAG_KEY}`, "1");
+  if (migrated) {
+    /* legacy keys left in place for safety; scoped copy is authoritative */
   }
 }

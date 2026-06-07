@@ -1,4 +1,5 @@
 import { getApiBase } from './api-base';
+import { normalizeStreamError } from './errors';
 import type {
 	CartItem,
 	ChatMode,
@@ -64,25 +65,39 @@ function dispatchEvent(event: SseEvent, callbacks: StreamChatCallbacks): void {
 	}
 }
 
+function parseSseLine(
+	line: string,
+	callbacks: StreamChatCallbacks,
+	onDone?: () => void,
+): void {
+	if (!line.startsWith('data:')) return;
+	const json = line.slice(5).trim();
+	if (!json) return;
+	try {
+		const event = JSON.parse(json) as SseEvent;
+		if (event.type === 'done') {
+			onDone?.();
+			return;
+		}
+		dispatchEvent(event, callbacks);
+	} catch {
+		// skip malformed chunks
+	}
+}
+
 function parseSseBuffer(
 	buffer: string,
 	callbacks: StreamChatCallbacks,
+	onDone?: () => void,
 ): string {
 	const parts = buffer.split('\n\n');
 	const remainder = parts.pop() ?? '';
 
 	for (const part of parts) {
+		if (!part.trim()) continue;
 		const lines = part.split('\n');
 		for (const line of lines) {
-			if (!line.startsWith('data:')) continue;
-			const json = line.slice(5).trim();
-			if (!json) continue;
-			try {
-				const event = JSON.parse(json) as SseEvent;
-				dispatchEvent(event, callbacks);
-			} catch {
-				// skip malformed chunks
-			}
+			parseSseLine(line, callbacks, onDone);
 		}
 	}
 
@@ -113,17 +128,13 @@ export async function streamChat(
 			signal,
 		});
 	} catch {
-		callbacks.onError('Kapruka is having a moment. Please try again.');
+		callbacks.onError(normalizeStreamError(''));
 		callbacks.onDone();
 		return;
 	}
 
 	if (!res.ok || !res.body) {
-		callbacks.onError(
-			res.status === 429
-				? 'Too many requests. Let me catch my breath! Try in 30 seconds.'
-				: 'Kapruka is having a moment. Please try again.',
-		);
+		callbacks.onError(normalizeStreamError('', res.status));
 		callbacks.onDone();
 		return;
 	}
@@ -170,16 +181,19 @@ export async function streamChat(
 			const { done, value } = await reader.read();
 			if (done) break;
 			buffer += decoder.decode(value, { stream: true });
-			buffer = parseSseBuffer(buffer, {
-				...wrappedCallbacks,
-				onDone: finish,
-			});
+			buffer = parseSseBuffer(
+				buffer,
+				wrappedCallbacks,
+				finish,
+			);
 		}
 		if (buffer.trim()) {
-			parseSseBuffer(`${buffer}\n\n`, {
-				...wrappedCallbacks,
-				onDone: finish,
-			});
+			const trailing = buffer.includes('\n')
+				? buffer
+				: `${buffer}\n`;
+			for (const line of trailing.split('\n')) {
+				parseSseLine(line, wrappedCallbacks, finish);
+			}
 		}
 	} finally {
 		flushText();

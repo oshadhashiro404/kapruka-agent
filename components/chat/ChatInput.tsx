@@ -123,7 +123,7 @@ export default function ChatInput({
               type="button"
               disabled={disabled}
               onClick={() => handleChip(chip.msg)}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-elevated border border-border text-muted hover:border-primary/70 hover:text-foreground hover:bg-surface transition-all duration-200 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-elevated border border-border text-muted hover:border-chat-glow/50 hover:text-foreground hover:bg-chat-bot transition-all duration-200 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <span aria-hidden>{chip.emoji}</span>
               <span>{chip.en}</span>
@@ -139,14 +139,14 @@ export default function ChatInput({
             onInput={onInput}
             disabled={disabled}
             rows={1}
-            placeholder="Ask anything… / ඕනෑ දෙයක් අහන්න…"
-            className="flex-1 resize-none rounded-2xl border border-border bg-elevated text-foreground placeholder:text-muted px-4 py-3.5 text-base focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/30 disabled:opacity-50 min-h-[52px] max-h-24 transition-shadow"
+            placeholder="What are you looking for today? / අද ඔයාට ඕන දෙය මොකක්ද?"
+            className="flex-1 resize-none rounded-2xl border border-border bg-elevated text-foreground placeholder:text-muted px-4 py-3.5 text-base focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-chat-glow/30 disabled:opacity-50 min-h-[52px] max-h-24 transition-shadow shadow-[0_0_12px_-8px_rgba(157,114,255,0.2)]"
           />
           <button
             type="button"
             onClick={handleSend}
             disabled={disabled || !text.trim()}
-            className="shrink-0 w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-40 hover:bg-primary-hover active:scale-95 transition-all shadow-md shadow-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="shrink-0 w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-40 hover:bg-primary-hover active:scale-95 transition-all shadow-lg shadow-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/50"
             aria-label="Send message"
           >
             <SendIcon />

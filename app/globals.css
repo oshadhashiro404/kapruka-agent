@@ -1,19 +1,22 @@
 @import 'tailwindcss';
 
 :root {
-	--bg-base: #0c0b0a;
-	--bg-surface: #161412;
-	--bg-elevated: #1f1c19;
-	--border: #2d2824;
-	--text-primary: #f8f4ef;
-	--text-muted: #a89f94;
-	--accent: #e65100;
-	--accent-hover: #ff7a2e;
-	--accent-soft: rgba(230, 81, 0, 0.25);
+	--bg-base: #080612;
+	--bg-surface: #12101f;
+	--bg-elevated: #1a1630;
+	--border: #2a2445;
+	--text-primary: #f5f3ff;
+	--text-muted: #9d93b8;
+	--accent: #7c3aed;
+	--accent-hover: #9d72ff;
+	--accent-soft: rgba(124, 58, 237, 0.25);
 	--success: #2dd4a0;
 	--warning: #f5b942;
 	--danger: #ef4444;
-	--pay-bg: #0d1a14;
+	--pay-bg: #0f1219;
+	--chat-user-bg: #6d28d9;
+	--chat-bot-bg: #151028;
+	--chat-glow: #9d72ff;
 }
 
 @theme inline {
@@ -31,6 +34,9 @@
 	--color-elevated: var(--bg-elevated);
 	--color-border: var(--border);
 	--color-muted: var(--text-muted);
+	--color-chat-user: var(--chat-user-bg);
+	--color-chat-bot: var(--chat-bot-bg);
+	--color-chat-glow: var(--chat-glow);
 	--font-sans: var(--font-inter), 'Segoe UI', sans-serif;
 	--font-sinhala:
 		var(--font-noto-sinhala), 'Noto Sans Sinhala', 'Segoe UI', sans-serif;
@@ -151,15 +157,15 @@
 @keyframes add-burst {
 	0% {
 		transform: scale(1);
-		box-shadow: 0 0 0 0 rgba(230, 81, 0, 0.4);
+		box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.4);
 	}
 	50% {
 		transform: scale(1.05);
-		box-shadow: 0 6px 18px -6px rgba(230, 81, 0, 0.35);
+		box-shadow: 0 6px 18px -6px rgba(157, 114, 255, 0.35);
 	}
 	100% {
 		transform: scale(1);
-		box-shadow: 0 0 0 0 rgba(230, 81, 0, 0);
+		box-shadow: 0 0 0 0 rgba(124, 58, 237, 0);
 	}
 }
 
@@ -174,7 +180,8 @@
 	.animate-tab-enter,
 	.animate-pay-pulse,
 	.animate-scale-in,
-	.animate-chip-pop {
+	.animate-chip-pop,
+	.animate-add-burst {
 		animation: none;
 	}
 }
@@ -193,7 +200,11 @@
 }
 
 body {
-	background: var(--bg-base);
+	background: radial-gradient(
+		ellipse 120% 80% at 50% -10%,
+		#141028 0%,
+		var(--bg-base) 55%
+	);
 	color: var(--text-primary);
 	font-family: var(--font-sans);
 }
@@ -202,4 +213,16 @@ html,
 body {
 	height: 100%;
 	overflow: hidden;
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border-width: 0;
 }

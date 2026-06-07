@@ -13,7 +13,7 @@ export default function ScrollFab({ visible, onClick }: ScrollFabProps) {
       type="button"
       onClick={onClick}
       aria-label="Scroll to bottom"
-      className="fixed bottom-28 right-6 z-20 w-11 h-11 rounded-full bg-primary text-white shadow-lg flex items-center justify-center animate-fade-in-up hover:bg-primary-hover transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+      className="fixed bottom-28 right-6 z-20 w-11 h-11 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center animate-fade-in-up hover:bg-primary-hover transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
     >
       <svg
         width="20"

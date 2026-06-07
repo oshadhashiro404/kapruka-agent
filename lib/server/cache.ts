@@ -16,10 +16,11 @@ const logger = pino({ level: process.env.LOG_LEVEL ?? 'info' });
 let redisClient: RedisType | null = null;
 if (process.env.REDIS_URL && Redis) {
 	try {
-		redisClient = new Redis(process.env.REDIS_URL);
-		redisClient.on('error', (err: Error) =>
+		const client = new Redis(process.env.REDIS_URL) as RedisType;
+		client.on('error', (err: Error) =>
 			logger.error({ err }, 'Redis error'),
 		);
+		redisClient = client;
 		logger.info('Connected to Redis');
 	} catch (e) {
 		logger.warn('Failed to connect to Redis, falling back to memory cache');

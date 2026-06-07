@@ -17,6 +17,27 @@ Open [http://localhost:3000](http://localhost:3000). API routes are same-origin 
 
 Do **not** set `NEXT_PUBLIC_BACKEND_URL` unless you still run the legacy Express server on port 3001.
 
+## Scripts
+
+| Command | Purpose |
+|---------|---------|
+| `pnpm dev` | Start dev server |
+| `pnpm build` | Production build |
+| `pnpm start` | Run production server |
+| `pnpm lint` | ESLint |
+| `pnpm test` | Run Vitest test suite |
+| `pnpm test:watch` | Vitest in watch mode |
+
+## Environment variables
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `GROQ_API_KEY` | Yes | Groq API key for chat |
+| `GROQ_MODEL_FAST` | No | Fast model override |
+| `GROQ_MODEL_STRONG` | No | Strong model override |
+| `MCP_ENDPOINT` | No | Kapruka MCP endpoint |
+| `NEXT_PUBLIC_BACKEND_URL` | No | Only for legacy Express backend |
+
 ## Deploy to Vercel (Hobby)
 
 1. Import repo; set **Root Directory** to `frontend`.
@@ -27,6 +48,14 @@ Do **not** set `NEXT_PUBLIC_BACKEND_URL` unless you still run the legacy Express
 3. Deploy.
 
 **Hobby limits:** `/api/chat` has `maxDuration: 10` seconds. Browse/search uses a fast-path without Groq when possible. Complex checkout flows may timeout on free tier — use the in-app **Checkout wizard** (`/api/order/create`) for reliable pay links without the full Groq tool loop.
+
+## Architecture highlights
+
+- **Chat hooks:** `useBackendHealth`, `useCategories`, `useChatSession`, `useChatStreaming`
+- **Validation:** Zod schemas in `lib/schemas.ts` and `lib/checkout/checkout-schema.ts`
+- **Errors:** Centralized in `lib/errors.ts`
+- **UI primitives:** `ProductImage`, `LoadingState`, `AccessibleDialog`
+- **Tests:** Vitest + Testing Library in `tests/`
 
 ## API routes
 

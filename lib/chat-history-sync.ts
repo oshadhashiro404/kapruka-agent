@@ -4,10 +4,6 @@ import { loadChatHistory, saveChatHistory } from "./api";
 import type { ChatSession } from "./types";
 import { getOrCreateUserId } from "./user-id";
 
-function latestActivity(sessions: ChatSession[]): number {
-  return sessions.reduce((max, s) => Math.max(max, s.createdAt ?? 0), 0);
-}
-
 export async function pullRemoteChatHistory(): Promise<{
   sessions: ChatSession[];
   activeSessionId: string;
@@ -28,22 +24,27 @@ export async function pullRemoteChatHistory(): Promise<{
 }
 
 export function shouldPreferRemote(
-  localSessions: ChatSession[],
-  remoteSessions: ChatSession[],
-  remoteUpdatedAt: number
+  localUpdatedAt: number,
+  remoteUpdatedAt: number,
+  counts?: { localSessionCount: number; remoteSessionCount: number }
 ): boolean {
-  const localUpdated = latestActivity(localSessions);
-  if (remoteSessions.length > localSessions.length && remoteUpdatedAt >= localUpdated) {
+  if (remoteUpdatedAt > localUpdatedAt) return true;
+  if (
+    counts &&
+    counts.remoteSessionCount > counts.localSessionCount &&
+    remoteUpdatedAt >= localUpdatedAt
+  ) {
     return true;
   }
-  return remoteUpdatedAt > localUpdated;
+  return false;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function scheduleChatHistorySave(
   sessions: ChatSession[],
-  activeSessionId: string
+  activeSessionId: string,
+  updatedAt?: number
 ): void {
   if (typeof window === "undefined") return;
   if (saveTimer) clearTimeout(saveTimer);
@@ -54,7 +55,7 @@ export function scheduleChatHistorySave(
       user_id: userId,
       sessions,
       activeSessionId,
-      updated_at: Date.now(),
+      updated_at: updatedAt ?? Date.now(),
     });
   }, 800);
 }

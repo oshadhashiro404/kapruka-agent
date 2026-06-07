@@ -46,7 +46,7 @@ export default function Header({ onCartClick, onBrowseClick }: HeaderProps) {
           <h1 className="text-base sm:text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent leading-tight tracking-tight truncate">
             Kapruka
           </h1>
-          <p className="font-sinhala text-[10px] text-muted">කප්රුකා · Chat Shopping</p>
+          <p className="font-sinhala text-[10px] text-muted">Shopping buddy · Chat</p>
         </div>
       </div>
       <div className="hidden lg:block shrink-0">

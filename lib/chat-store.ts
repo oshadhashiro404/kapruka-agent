@@ -32,10 +32,27 @@ function reviveMessages(messages: ChatMessage[]): ChatMessage[] {
   }));
 }
 
+export function computeSessionsUpdatedAt(sessions: ChatSession[]): number {
+  return sessions.reduce((max, s) => {
+    const sessionTs = s.createdAt ?? 0;
+    const messageTs = (s.messages ?? []).reduce((mMax, m) => {
+      const ts =
+        m.timestamp instanceof Date
+          ? m.timestamp.getTime()
+          : typeof m.timestamp === "string"
+            ? new Date(m.timestamp).getTime()
+            : 0;
+      return Math.max(mMax, Number.isFinite(ts) ? ts : 0);
+    }, 0);
+    return Math.max(max, sessionTs, messageTs);
+  }, 0);
+}
+
 interface ChatState {
   sessions: ChatSession[];
   activeSessionId: string;
   hydrated: boolean;
+  updatedAt: number;
   getActiveSession: () => ChatSession;
   addSession: () => string;
   switchSession: (id: string) => void;
@@ -50,11 +67,20 @@ interface ChatState {
   hydrateFromRemote: (data: {
     sessions: ChatSession[];
     activeSessionId: string;
+    updatedAt?: number;
   }) => void;
   setHydrated: () => void;
+  touchUpdatedAt: () => void;
 }
 
 const initialSession = createEmptySession();
+
+function withUpdatedAt(
+  sessions: ChatSession[],
+  extra?: number
+): number {
+  return Math.max(computeSessionsUpdatedAt(sessions), extra ?? 0, Date.now());
+}
 
 export const useChatStore = create<ChatState>()(
   persist(
@@ -62,6 +88,7 @@ export const useChatStore = create<ChatState>()(
       sessions: [initialSession],
       activeSessionId: initialSession.id,
       hydrated: false,
+      updatedAt: Date.now(),
 
       getActiveSession: () => {
         const { sessions, activeSessionId } = get();
@@ -81,13 +108,14 @@ export const useChatStore = create<ChatState>()(
         set((state) => ({
           sessions: [session, ...state.sessions],
           activeSessionId: session.id,
+          updatedAt: withUpdatedAt([session, ...state.sessions]),
         }));
         return session.id;
       },
 
       switchSession: (id) => {
         if (get().sessions.some((s) => s.id === id)) {
-          set({ activeSessionId: id });
+          set({ activeSessionId: id, updatedAt: Date.now() });
         }
       },
 
@@ -96,64 +124,83 @@ export const useChatStore = create<ChatState>()(
           const next = state.sessions.filter((s) => s.id !== id);
           if (next.length === 0) {
             const fresh = createEmptySession();
-            return { sessions: [fresh], activeSessionId: fresh.id };
+            return {
+              sessions: [fresh],
+              activeSessionId: fresh.id,
+              updatedAt: withUpdatedAt([fresh]),
+            };
           }
           const activeSessionId =
             state.activeSessionId === id ? next[0].id : state.activeSessionId;
-          return { sessions: next, activeSessionId };
+          return {
+            sessions: next,
+            activeSessionId,
+            updatedAt: withUpdatedAt(next),
+          };
         });
       },
 
       setSessionMessages: (sessionId, messages) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
+        set((state) => {
+          const sessions = state.sessions.map((s) =>
             s.id === sessionId ? { ...s, messages } : s
-          ),
-        }));
+          );
+          return { sessions, updatedAt: withUpdatedAt(sessions) };
+        });
       },
 
       updateSessionMessages: (sessionId, updater) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
+        set((state) => {
+          const sessions = state.sessions.map((s) =>
             s.id === sessionId
               ? { ...s, messages: updater(reviveMessages(s.messages)) }
               : s
-          ),
-        }));
+          );
+          return { sessions, updatedAt: withUpdatedAt(sessions) };
+        });
       },
 
       setSessionTitle: (sessionId, title) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
+        set((state) => {
+          const sessions = state.sessions.map((s) =>
             s.id === sessionId ? { ...s, title } : s
-          ),
-        }));
+          );
+          return { sessions, updatedAt: withUpdatedAt(sessions) };
+        });
       },
 
       setServerContext: (sessionId, context) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
+        set((state) => {
+          const sessions = state.sessions.map((s) =>
             s.id === sessionId ? { ...s, serverContext: context } : s
-          ),
-        }));
+          );
+          return { sessions, updatedAt: withUpdatedAt(sessions) };
+        });
       },
 
-      hydrateFromRemote: ({ sessions, activeSessionId }) => {
+      hydrateFromRemote: ({ sessions, activeSessionId, updatedAt }) => {
         const revived = sessions.map((s) => ({
           ...s,
           messages: reviveMessages(s.messages ?? []),
         }));
         const activeOk = revived.some((s) => s.id === activeSessionId);
+        const nextSessions = revived.length ? revived : [createEmptySession()];
         set({
-          sessions: revived.length ? revived : [createEmptySession()],
+          sessions: nextSessions,
           activeSessionId: activeOk
             ? activeSessionId
-            : (revived[0]?.id ?? createEmptySession().id),
+            : (nextSessions[0]?.id ?? createEmptySession().id),
           hydrated: true,
+          updatedAt: updatedAt ?? withUpdatedAt(nextSessions),
         });
       },
 
       setHydrated: () => set({ hydrated: true }),
+
+      touchUpdatedAt: () =>
+        set((state) => ({
+          updatedAt: withUpdatedAt(state.sessions),
+        })),
     }),
     {
       name: CHAT_PERSIST_NAME,
@@ -161,6 +208,7 @@ export const useChatStore = create<ChatState>()(
       partialize: (state) => ({
         sessions: state.sessions,
         activeSessionId: state.activeSessionId,
+        updatedAt: state.updatedAt,
       }),
       onRehydrateStorage: () => (state) => {
         migrateLegacyUserStorage();
@@ -174,6 +222,9 @@ export const useChatStore = create<ChatState>()(
           !state.sessions.some((s) => s.id === state.activeSessionId)
         ) {
           state.activeSessionId = state.sessions[0].id;
+        }
+        if (!state.updatedAt) {
+          state.updatedAt = computeSessionsUpdatedAt(state.sessions);
         }
         state.hydrated = true;
       },

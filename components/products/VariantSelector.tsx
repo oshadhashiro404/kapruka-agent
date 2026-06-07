@@ -30,14 +30,14 @@ export default function VariantSelector({
 
   return (
     <div className="fixed inset-0 z-[55] flex items-end sm:items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-[#1a1a1a] border border-[#2e2e2e] p-5">
-        <h3 className="font-bold text-lg text-[#f0f0f0] mb-1">{product.name}</h3>
-        <p className="text-[#e65100] font-bold mb-4">
+      <div className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5">
+        <h3 className="font-bold text-lg text-foreground mb-1">{product.name}</h3>
+        <p className="text-primary font-bold mb-4">
           {formatLKR(product.price_lkr)}
         </p>
         {groups.map((g) => (
           <div key={g.label} className="mb-3">
-            <p className="text-sm font-medium text-[#8a8a8a] mb-2">{g.label}</p>
+            <p className="text-sm font-medium text-muted mb-2">{g.label}</p>
             <div className="flex flex-wrap gap-2">
               {g.options.map((opt) => (
                 <button
@@ -46,8 +46,8 @@ export default function VariantSelector({
                   onClick={() => setSelected(opt)}
                   className={`px-3 py-1.5 rounded-lg border text-sm ${
                     selected === opt
-                      ? "border-[#e65100] bg-[#2a1f00] text-[#ff8f4e] font-semibold"
-                      : "border-[#2e2e2e] text-[#f0f0f0]"
+                      ? "border-primary bg-primary/15 text-accent font-semibold"
+                      : "border-border text-foreground"
                   }`}
                 >
                   {opt}
@@ -60,7 +60,7 @@ export default function VariantSelector({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl border border-[#2e2e2e] text-[#8a8a8a]"
+            className="flex-1 py-2.5 rounded-xl border border-border text-muted"
           >
             Cancel
           </button>
@@ -68,7 +68,7 @@ export default function VariantSelector({
             type="button"
             onClick={() => onConfirm(selected)}
             disabled={groups.length > 0 && !selected}
-            className="flex-1 py-2.5 rounded-xl bg-[#e65100] text-white font-semibold disabled:opacity-40"
+            className="flex-1 py-2.5 rounded-xl bg-primary text-white font-semibold disabled:opacity-40 hover:bg-primary-hover"
           >
             Add to Cart
           </button>

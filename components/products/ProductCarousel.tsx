@@ -3,8 +3,7 @@
 import { useState } from "react";
 import type { Product } from "@/lib/types";
 import { dedupeProducts } from "@/lib/utils";
-import ProductCard from "./ProductCard";
-import ProductGrid from "./ProductGrid";
+import RecommendationCard from "./RecommendationCard";
 
 const MAX_VISIBLE = 5;
 
@@ -17,6 +16,15 @@ interface ProductCarouselProps {
   searchCategory?: string;
   searchCursor?: string;
   onLoadMore?: (newProducts: Product[], cursor?: string) => void;
+}
+
+function RecommendationSkeleton() {
+  return (
+    <div
+      className="shrink-0 w-[152px] h-[220px] rounded-2xl bg-elevated border border-border animate-pulse"
+      aria-hidden
+    />
+  );
 }
 
 export default function ProductCarousel({
@@ -36,15 +44,9 @@ export default function ProductCarousel({
 
   if (loading) {
     return (
-      <div className="space-y-2">
-        {[1, 2].map((i) => (
-          <ProductCard
-            key={i}
-            product={{} as Product}
-            onView={() => {}}
-            onAdd={() => {}}
-            loading
-          />
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+        {[1, 2, 3].map((i) => (
+          <RecommendationSkeleton key={i} />
         ))}
       </div>
     );
@@ -87,15 +89,10 @@ export default function ProductCarousel({
   };
 
   return (
-    <div className="mt-3">
-      <ProductGrid
-        products={displayProducts}
-        onView={onView}
-        onAdd={onAdd}
-      />
-      <div className="lg:hidden space-y-2">
+    <div>
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 -mx-1 px-1">
         {displayProducts.map((p) => (
-          <ProductCard
+          <RecommendationCard
             key={p.id}
             product={p}
             onView={onView}
@@ -108,13 +105,15 @@ export default function ProductCarousel({
           type="button"
           onClick={handleLoadMore}
           disabled={loadingMore}
-          className="w-full flex items-center justify-center gap-1.5 py-2.5 mt-2 text-sm text-muted hover:text-primary border border-border rounded-xl hover:border-primary/40 transition-colors disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-1.5 py-2.5 mt-2 text-sm text-muted hover:text-primary border border-border rounded-xl hover:border-chat-glow/40 transition-colors disabled:opacity-50"
         >
-          {loadingMore
-            ? "Loading…"
-            : canFetchMore && cursor
-              ? "Load more from Kapruka"
-              : `Show ${unique.length - MAX_VISIBLE} more`}
+          {loadingMore ? (
+            "Loading…"
+          ) : canFetchMore && cursor ? (
+            "Load more from Kapruka"
+          ) : (
+            `Show ${unique.length - MAX_VISIBLE} more`
+          )}
         </button>
       )}
     </div>

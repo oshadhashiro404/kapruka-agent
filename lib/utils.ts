@@ -135,22 +135,7 @@ export function stripJsonFromDisplay(text: string): string {
   return out;
 }
 
-/** Never show raw API JSON in the chat bubble */
-export function toUserFriendlyError(message: string): string {
-  const fallback =
-    "Something went wrong. Please try again or rephrase your request.";
-  if (!message) return fallback;
-  if (
-    message.startsWith("{") ||
-    message.includes('"error"') ||
-    message.includes("tool_use_failed") ||
-    message.includes("invalid_request_error") ||
-    message.length > 280
-  ) {
-    return fallback;
-  }
-  return message;
-}
+export { toUserFriendlyError } from "./errors";
 
 export function truncate(text: string, max: number): string {
   if (text.length <= max) return text;

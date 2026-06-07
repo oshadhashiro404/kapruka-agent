@@ -411,7 +411,7 @@ export function toUserFriendlyGroqError(err: unknown): {
   partialReply?: string;
 } {
   const fallback =
-    "I had trouble with that request. Please try again or rephrase what you're looking for.";
+    "Hmm, I hit a snag on that one. Could you try again or rephrase what you're looking for?";
 
   if (!(err instanceof Error)) {
     return { message: fallback };

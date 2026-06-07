@@ -121,8 +121,8 @@ export function buildIntentReply(intent: ShoppingIntent, count: number): string 
   const types = intent.labels.join(", ");
 
   if (count === 0) {
-    return `I searched Kapruka for ${types}${budgetPart} but didn't find matches. Want me to try a wider budget or different items (e.g. gift hampers or cakes)?`;
+    return `Hmm, I couldn't find ${types}${budgetPart} on Kapruka right now. Want me to try a wider budget or different items?`;
   }
 
-  return `Here are ${count} ideas for ${types}${budgetPart}. Check the product cards below — tap Add on anything you like, or tell me if you want fancier or cheaper options.`;
+  return `Love that! Here are ${count} great finds for ${types}${budgetPart} — tap Add on anything you like, or tell me if you want fancier or cheaper options.`;
 }

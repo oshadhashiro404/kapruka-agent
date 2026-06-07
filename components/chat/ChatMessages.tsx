@@ -93,6 +93,9 @@ export default function ChatMessages({
             onProductsAppend={onProductsAppend}
           />
         ))}
+        <div aria-live="polite" aria-atomic="false" className="sr-only">
+          {isLoading && (status ? `Assistant: ${status}` : "Assistant is typing")}
+        </div>
         {isLoading && <TypingIndicator status={status} />}
         <div ref={bottomRef} className="h-1" />
       </div>

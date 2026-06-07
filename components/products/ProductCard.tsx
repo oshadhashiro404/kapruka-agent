@@ -1,80 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import ProductImage from '@/components/ui/ProductImage';
+import LoadingState from '@/components/ui/LoadingState';
 import type { Product } from '@/lib/types';
-import { formatLKR, productImageSrc } from '@/lib/utils';
+import { formatLKR } from '@/lib/utils';
 
 interface ProductCardProps {
 	product: Product;
 	onView: (product: Product) => void;
 	onAdd: (product: Product) => void;
 	loading?: boolean;
-}
-
-function ProductImagePlaceholder({ name }: { name: string }) {
-	const letter = name?.charAt(0)?.toUpperCase() || '?';
-	return (
-		<div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-surface">
-			<span className="text-2xl font-bold text-primary/60">{letter}</span>
-		</div>
-	);
-}
-
-function ProductThumb({
-	product,
-	rawSrc,
-}: {
-	product: Product;
-	rawSrc: string;
-}) {
-	const hasImage = rawSrc.length > 0;
-	const [imgState, setImgState] = useState<'loading' | 'loaded' | 'error'>(
-		'loading',
-	);
-	const [retry, setRetry] = useState(0);
-
-	useEffect(() => {
-		if (!hasImage || imgState !== 'loading') return;
-		const t = setTimeout(() => setImgState('error'), 15_000);
-		return () => clearTimeout(t);
-	}, [hasImage, imgState]);
-
-	const imgSrc =
-		retry > 0
-			? `${rawSrc}${rawSrc.includes('?') ? '&' : '?'}r=${retry}`
-			: rawSrc;
-
-	if (!hasImage || imgState === 'error') {
-		return <ProductImagePlaceholder name={product.name} />;
-	}
-
-	return (
-		<>
-			{imgState === 'loading' && (
-				<div className="absolute inset-0 bg-border animate-pulse" />
-			)}
-			{/* eslint-disable-next-line @next/next/no-img-element */}
-			<img
-				key={imgSrc}
-				src={imgSrc}
-				alt={product.name}
-				className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-					imgState === 'loaded' ? 'opacity-100' : 'opacity-0'
-				} ${!product.in_stock ? 'grayscale opacity-50' : ''}`}
-				loading="lazy"
-				decoding="async"
-				onLoad={() => setImgState('loaded')}
-				onError={() => {
-					if (retry < 1) {
-						setRetry((r) => r + 1);
-						setImgState('loading');
-					} else {
-						setImgState('error');
-					}
-				}}
-			/>
-		</>
-	);
 }
 
 export default function ProductCard({
@@ -86,27 +22,13 @@ export default function ProductCard({
 	const [addingAnim, setAddingAnim] = useState(false);
 
 	const handleAdd = (p: Product) => {
-		try {
-			setAddingAnim(true);
-		} catch {}
+		setAddingAnim(true);
 		onAdd(p);
 		setTimeout(() => setAddingAnim(false), 380);
 	};
-	const rawSrc = productImageSrc(
-		product.image_url || product.images?.[0] || '',
-	);
 
 	if (loading) {
-		return (
-			<div className="w-full flex gap-3 p-3 rounded-xl bg-elevated border border-border animate-pulse">
-				<div className="w-16 h-16 rounded-xl bg-border shrink-0" />
-				<div className="flex-1 space-y-2 pt-1">
-					<div className="h-4 bg-border rounded w-3/4" />
-					<div className="h-3 bg-border rounded w-1/2" />
-					<div className="h-3 bg-border rounded w-1/4" />
-				</div>
-			</div>
-		);
+		return <LoadingState variant="card" />;
 	}
 
 	return (
@@ -117,10 +39,12 @@ export default function ProductCard({
 				className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-border"
 				aria-label={`View ${product.name}`}
 			>
-				<ProductThumb
-					key={rawSrc || product.id}
-					product={product}
-					rawSrc={rawSrc}
+				<ProductImage
+					name={product.name}
+					imageUrl={product.image_url}
+					images={product.images}
+					inStock={product.in_stock}
+					className="absolute inset-0"
 				/>
 			</button>
 

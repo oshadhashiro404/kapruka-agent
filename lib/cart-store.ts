@@ -9,6 +9,27 @@ import {
   migrateLegacyUserStorage,
 } from "./user-id";
 
+export function cartTotalLkr(items: CartItem[]): number {
+  return items.reduce(
+    (sum, i) => sum + i.product.price_lkr * i.quantity,
+    0
+  );
+}
+
+export function cartItemCount(items: CartItem[]): number {
+  return items.reduce((sum, i) => sum + i.quantity, 0);
+}
+
+export function findCartLine(
+  items: CartItem[],
+  productId: string,
+  variant?: string
+): CartItem | undefined {
+  return items.find(
+    (i) => i.product.id === productId && i.selected_variant === variant
+  );
+}
+
 interface CartState {
   items: CartItem[];
   session_id: string;
@@ -52,17 +73,12 @@ export const useCartStore = create<CartState>()(
       setDeliveryCost: (cost) => set({ deliveryCostLkr: cost }),
 
       addItem: (product, variant, isGift = false) => {
-        const items = get().items;
-        const existing = items.find(
-          (i) =>
-            i.product.id === product.id &&
-            i.selected_variant === variant
-        );
+        const items = [...get().items];
+        const existing = findCartLine(items, product.id, variant);
         if (existing) {
           set({
             items: items.map((i) =>
-              i.product.id === product.id &&
-              i.selected_variant === variant
+              i.product.id === product.id && i.selected_variant === variant
                 ? { ...i, quantity: i.quantity + 1 }
                 : i
             ),
@@ -112,18 +128,13 @@ export const useCartStore = create<CartState>()(
           ),
         }),
 
-      setItems: (items) => set({ items }),
+      setItems: (items) => set({ items: [...items] }),
 
       clearCart: () => set({ items: [], deliveryCostLkr: 0 }),
 
-      totalLkr: () =>
-        get().items.reduce(
-          (sum, i) => sum + i.product.price_lkr * i.quantity,
-          0
-        ),
+      totalLkr: () => cartTotalLkr(get().items),
 
-      itemCount: () =>
-        get().items.reduce((sum, i) => sum + i.quantity, 0),
+      itemCount: () => cartItemCount(get().items),
 
       ensureSessionId: () => {
         const current = get().session_id;
@@ -149,8 +160,11 @@ export const useCartStore = create<CartState>()(
       }),
       onRehydrateStorage: () => (state) => {
         migrateLegacyUserStorage();
-        if (state && (!state.session_id || state.session_id.length === 0)) {
-          state.session_id = generateId();
+        if (state) {
+          if (!state.session_id || state.session_id.length === 0) {
+            state.session_id = generateId();
+          }
+          state.items = [...(state.items ?? [])];
         }
       },
     }

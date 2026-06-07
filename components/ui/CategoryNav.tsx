@@ -1,5 +1,6 @@
 "use client";
 
+import LoadingState from "@/components/ui/LoadingState";
 import type { KaprukaCategory } from "@/lib/types";
 
 interface CategoryNavProps {
@@ -17,13 +18,8 @@ export default function CategoryNav({
 }: CategoryNavProps) {
   if (loading) {
     return (
-      <div className="shrink-0 flex gap-2 px-4 py-2 border-b border-border overflow-x-auto scrollbar-hide">
-        {[1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className="shrink-0 h-8 w-20 rounded-full bg-elevated animate-pulse"
-          />
-        ))}
+      <div className="shrink-0 px-4 py-2 border-b border-border">
+        <LoadingState variant="skeleton-pills" />
       </div>
     );
   }

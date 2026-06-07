@@ -23,15 +23,15 @@ export default function OccasionGrid({
     <div className="w-full min-h-[min(70vh,600px)] flex flex-col justify-center py-8 px-1 animate-fade-in-up">
       <div className="text-center mb-8">
         <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-          Shop Kapruka through chat
+          Hi! I&apos;m your Kapruka shopping buddy
         </h2>
         <div className="w-16 h-1 bg-gradient-to-r from-primary to-accent mx-auto mt-3 rounded-full" />
         <p className="font-sinhala text-sm text-primary/90 mt-3">
-          ආයුබෝවන්! මම ඔබේ Kapruka සහායක
+          ආයුබෝවන්! මම ඔබේ Kapruka shopping buddy
         </p>
         <p className="text-sm text-muted mt-3 max-w-md mx-auto leading-relaxed">
-          Search gifts, cakes, flowers, electronics — check delivery across Sri
-          Lanka and checkout in minutes.
+          What are you looking for today? Search gifts, cakes, flowers,
+          electronics — check delivery across Sri Lanka and checkout in minutes.
         </p>
       </div>
 
@@ -48,7 +48,7 @@ export default function OccasionGrid({
                 onClick={() =>
                   onCategorySelect(cat.name)
                 }
-                className="px-4 py-2 rounded-full text-sm bg-elevated border border-border text-foreground hover:border-primary/60 hover:bg-surface transition-all"
+                className="px-4 py-2 rounded-full text-sm bg-elevated border border-border text-foreground hover:border-chat-glow/50 hover:bg-chat-bot transition-all hover:shadow-[0_0_12px_-6px_rgba(157,114,255,0.3)]"
               >
                 {cat.name}
               </button>
@@ -66,7 +66,7 @@ export default function OccasionGrid({
             key={tile.id}
             type="button"
             onClick={() => onSelect(tile.message)}
-            className="flex flex-col items-start gap-1 px-4 py-3.5 rounded-xl bg-elevated border border-border hover:border-primary/60 hover:bg-surface transition-all duration-200 text-left hover:shadow-md hover:shadow-primary/5 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="flex flex-col items-start gap-1 px-4 py-3.5 rounded-xl bg-elevated border border-border hover:border-chat-glow/50 hover:bg-chat-bot transition-all duration-200 text-left hover:shadow-[0_0_16px_-8px_rgba(157,114,255,0.35)] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
             <span className="text-2xl leading-none" aria-hidden>
               {tile.emoji}
