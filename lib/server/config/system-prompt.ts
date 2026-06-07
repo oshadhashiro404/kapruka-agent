@@ -48,6 +48,7 @@ CHECKOUT ORDER:
 4. kapruka_create_order → share pay link
 
 SEARCH: Budget X → min ~40% of X, max ~120%. Use specific q ("roses bouquet apology", "birthday cake") not just "gift".
+After search, only show emotionally appropriate matches — never dump unrelated catalog noise.
 
 GIFT MESSAGES: Suggest warm English card text; user can accept via chat. Combine EN + Sinhala in order gift_message if both provided.
 

@@ -1,6 +1,6 @@
 import Groq from "groq-sdk";
 import { KAPRUKA_SYSTEM_PROMPT } from "../config/system-prompt";
-import { buildCartChips } from "../config/product-keywords";
+import { buildCartChips, matchScenario } from "../config/product-keywords";
 import { KAPRUKA_GROQ_TOOLS } from "../config/kapruka-tools";
 import {
   buildConciergeReply,
@@ -11,10 +11,14 @@ import {
 import {
   buildIntentReply,
   classifyIntent,
-  runIntentSearch,
   shouldFastPathSearch,
   type Intent,
 } from "./intent-classifier";
+import {
+  rankProductsByRelevance,
+  type RelevanceContext,
+} from "./product-relevance";
+import { smartSearch } from "./smart-search";
 import {
   fetchPerishableAlternatives,
   parseDeliveryDate,
@@ -296,7 +300,28 @@ async function emitStructuredSideEffects(
       products = raw.filter((p) => p && isValidProduct(p));
     }
     if (products.length > 0) {
-      await enrichAndEmitProducts(products, emit, session);
+      const lastUser = [...session.messages]
+        .reverse()
+        .find((m) => m.role === "user")?.content;
+      const minP = Number(args.min_price);
+      const maxP = Number(args.max_price);
+      const budgetLkr =
+        !Number.isNaN(maxP) && maxP > 0
+          ? maxP
+          : !Number.isNaN(minP) && minP > 0
+            ? Math.round(minP / 0.4)
+            : undefined;
+      const ctx: RelevanceContext = {
+        query: String(args.q ?? ""),
+        budgetLkr,
+        userMessage: lastUser,
+      };
+      const filtered = rankProductsByRelevance(products, ctx, { limit: 8 });
+      await enrichAndEmitProducts(
+        filtered.length > 0 ? filtered : products.slice(0, 8),
+        emit,
+        session
+      );
     }
     return;
   }
@@ -535,8 +560,21 @@ async function tryConciergePath(
       userMessage,
       intent.extractedKeywords
     );
-    emit({ type: "status", message: "Searching Kapruka..." });
-    const products = await runIntentSearch(searchIntent);
+    emit({ type: "status", message: "Finding picks that actually fit..." });
+    const { products, curation } = await smartSearch(
+      {
+        query: searchIntent.query,
+        budgetLkr: searchIntent.budgetLkr,
+        labels: intent.extractedKeywords,
+      },
+      {
+        userMessage,
+        occasion: searchIntent.occasion ?? plan.occasion,
+        mustHave: searchIntent.mustHave ?? undefined,
+        avoid: searchIntent.avoid ?? undefined,
+        emotionalCuration: true,
+      }
+    );
     patchSessionContext(session, { lastSearchQuery: searchIntent.query });
 
     if (products.length > 0) {
@@ -545,7 +583,13 @@ async function tryConciergePath(
     }
 
     const { count, total } = cartTotals(session);
-    const reply = buildConciergeReply(plan, products.length, count, total);
+    const reply = buildConciergeReply(
+      plan,
+      products.length,
+      count,
+      total,
+      curation
+    );
     emitProductChips(session, emit, plan.chips);
     return reply;
   } catch {
@@ -562,8 +606,14 @@ async function tryFastPathSearch(
   if (!shouldFastPathSearch(intent) || !intent.searchIntent) return null;
 
   try {
-    emit({ type: "status", message: "Searching Kapruka..." });
-    const products = await runIntentSearch(intent.searchIntent);
+    emit({ type: "status", message: "Finding the best matches..." });
+    const userMsg = userMessageFromSession(session);
+    const { products } = await smartSearch(intent.searchIntent, {
+      userMessage: userMsg,
+      occasion: matchScenario(userMsg)?.occasion,
+      emotionalCuration:
+        intent.type === "gift_search" || Boolean(matchScenario(userMsg)),
+    });
     patchSessionContext(session, {
       lastSearchQuery: intent.searchIntent.query,
     });
@@ -575,6 +625,13 @@ async function tryFastPathSearch(
   } catch {
     return null;
   }
+}
+
+function userMessageFromSession(session: Session): string {
+  return (
+    [...session.messages].reverse().find((m) => m.role === "user")?.content ??
+    ""
+  );
 }
 
 /** Quote delivery for cart when user asks about delivery */
@@ -642,8 +699,11 @@ async function directMcpSearchFallback(
   if (!si || si.labels.length === 0) return null;
 
   try {
-    emit({ type: "status", message: "Searching Kapruka..." });
-    const products = await runIntentSearch(si);
+    emit({ type: "status", message: "Finding the best matches..." });
+    const { products } = await smartSearch(si, {
+      userMessage: userMessageFromSession(session),
+      emotionalCuration: intent.isNarrative,
+    });
     if (products.length > 0) {
       await enrichAndEmitProducts(products, emit, session);
     }

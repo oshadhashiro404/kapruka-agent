@@ -15,14 +15,19 @@ Given the user message and optional cart/context, return:
   "cartNudge": "optional line about pairing items" or null,
   "giftMessageEn": "suggested English gift card text" or null,
   "giftMessageSi": "suggested Sinhala gift card text (Sinhala script OK here)" or null,
+  "mustHave": ["rose", "bouquet"] or null,
+  "avoid": ["phone", "laptop"] or null,
+  "emotionalTone": "short description of what feeling to match",
   "skipSearch": false,
   "needsDeliveryDate": true if perishable and no date mentioned
 }
 
 Rules:
 - searchQuery must be specific (e.g. "red roses bouquet apology" not just "gift")
-- For breakup/apology → roses bouquet, advice hand-deliver
+- For breakup/apology → roses bouquet, mustHave roses/flowers, avoid electronics, advice hand-deliver
 - For vague "gift for mom" only → skipSearch true, ask ONE question about item type + budget
+- mustHave/avoid guide product filtering — be precise for the emotion
+- emotionalTone: e.g. "sincere apology, not flashy" or "joyful birthday surprise"
 - chips: include "Add first", "Add second" if multiple products likely; "Add a gift card" for gift occasions
 - Keep replyOpener under 40 words, max one emoji
 `.trim();

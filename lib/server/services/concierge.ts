@@ -25,6 +25,9 @@ const conciergePlanSchema = z.object({
   cartNudge: z.string().nullable().optional(),
   giftMessageEn: z.string().nullable().optional(),
   giftMessageSi: z.string().nullable().optional(),
+  mustHave: z.array(z.string()).nullable().optional(),
+  avoid: z.array(z.string()).nullable().optional(),
+  emotionalTone: z.string().nullable().optional(),
   skipSearch: z.boolean().optional(),
   needsDeliveryDate: z.boolean().optional(),
 });
@@ -140,7 +143,8 @@ export function buildConciergeReply(
   plan: ConciergePlan,
   productCount: number,
   cartItemCount: number,
-  cartTotalLkr: number
+  cartTotalLkr: number,
+  curation?: { topPickReason?: string; pairingTip?: string }
 ): string {
   if (plan.skipSearch) {
     return (
@@ -156,11 +160,14 @@ export function buildConciergeReply(
 
   if (productCount === 0) {
     parts.push(
-      "Hmm, nothing exact on Kapruka right now — want me to widen the budget or try something else?"
+      "Hmm, nothing that truly fits right now — want me to widen the budget or try a different angle?"
     );
+  } else if (curation?.topPickReason) {
+    parts.push(curation.topPickReason);
+    if (curation.pairingTip) parts.push(curation.pairingTip);
   } else {
     parts.push(
-      `Found ${productCount} pick${productCount === 1 ? "" : "s"} — tap Add on anything you like.`
+      `Picked ${productCount} that actually fit what you're going for — tap Add on anything you like.`
     );
   }
 
@@ -187,11 +194,21 @@ export function planToSearchIntent(
   plan: ConciergePlan,
   message: string,
   labels: string[]
-): { query: string; budgetLkr?: number; labels: string[] } {
+): {
+  query: string;
+  budgetLkr?: number;
+  labels: string[];
+  occasion?: string | null;
+  mustHave?: string[];
+  avoid?: string[];
+} {
   return {
     query: plan.searchQuery ?? buildRefinedQuery(message, labels),
     budgetLkr: plan.budgetLkr ?? undefined,
     labels,
+    occasion: plan.occasion,
+    mustHave: plan.mustHave ?? undefined,
+    avoid: plan.avoid ?? undefined,
   };
 }
 
