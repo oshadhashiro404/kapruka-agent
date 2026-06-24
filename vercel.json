@@ -2,6 +2,12 @@
   "functions": {
     "app/api/chat/route.ts": {
       "maxDuration": 10
+    },
+    "app/api/voice/tts/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/voice/stt/route.ts": {
+      "maxDuration": 30
     }
   }
 }

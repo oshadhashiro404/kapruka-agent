@@ -25,6 +25,7 @@ export interface ChatStreamingCallbacks {
   onCartToast: (message: string) => void;
   markHealthy: () => void;
   onGiftMessagePrompt?: (productId: string) => void;
+  onAssistantComplete?: (text: string) => void;
 }
 
 export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
@@ -101,6 +102,7 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
             timestamp: new Date(),
           },
         ]);
+        callbacks.onAssistantComplete?.(summary);
         return true;
       }
 
@@ -110,6 +112,7 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
           addItem(p, undefined, mode === "gift");
         }
         const names = toAdd.map((p) => p.name).join(" + ");
+        const reply = `Nice! Added ${names} to your cart.`;
         callbacks.onCartToast(`Added ${names}`);
         updateSessionMessages(sessionId, (prev) => [
           ...prev.filter((m) => m.id !== ASSISTANT_STREAM_ID),
@@ -117,16 +120,18 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
           {
             id: generateId(),
             role: "assistant",
-            content: `Nice! Added ${names} to your cart.`,
+            content: reply,
             timestamp: new Date(),
           },
         ]);
+        callbacks.onAssistantComplete?.(reply);
         return true;
       }
 
       if (wantsRemoveFirstProduct(text) && items[0]) {
         const removed = items[0];
         removeItem(removed.product.id, removed.selected_variant);
+        const reply = `Removed "${removed.product.name}" from your cart.`;
         callbacks.onCartToast(`Removed ${removed.product.name}`);
         updateSessionMessages(sessionId, (prev) => [
           ...prev.filter((m) => m.id !== ASSISTANT_STREAM_ID),
@@ -134,16 +139,18 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
           {
             id: generateId(),
             role: "assistant",
-            content: `Removed "${removed.product.name}" from your cart.`,
+            content: reply,
             timestamp: new Date(),
           },
         ]);
+        callbacks.onAssistantComplete?.(reply);
         return true;
       }
 
       const lineToRemove = matchCartLineByName(text, items);
       if (lineToRemove && /\b(remove|delete)\b/i.test(text)) {
         removeItem(lineToRemove.product.id, lineToRemove.selected_variant);
+        const reply = `Removed "${lineToRemove.product.name}" from your cart.`;
         callbacks.onCartToast(`Removed ${lineToRemove.product.name}`);
         updateSessionMessages(sessionId, (prev) => [
           ...prev.filter((m) => m.id !== ASSISTANT_STREAM_ID),
@@ -151,10 +158,11 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
           {
             id: generateId(),
             role: "assistant",
-            content: `Removed "${lineToRemove.product.name}" from your cart.`,
+            content: reply,
             timestamp: new Date(),
           },
         ]);
+        callbacks.onAssistantComplete?.(reply);
         return true;
       }
 
@@ -170,22 +178,25 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
             inCart.selected_variant
           );
         }
+        const reply = `Done — added your card message: "${pendingGiftSuggestion.messageEn}"`;
         updateSessionMessages(sessionId, (prev) => [
           ...prev.filter((m) => m.id !== ASSISTANT_STREAM_ID),
           userMsg,
           {
             id: generateId(),
             role: "assistant",
-            content: `Done — added your card message: "${pendingGiftSuggestion.messageEn}"`,
+            content: reply,
             timestamp: new Date(),
           },
         ]);
         setPendingGiftSuggestion(undefined);
+        callbacks.onAssistantComplete?.(reply);
         return true;
       }
 
       if (wantsClearCart(text) && items.length > 0) {
         clearCart();
+        const reply = "Cleared your cart.";
         callbacks.onCartToast("Cart cleared");
         updateSessionMessages(sessionId, (prev) => [
           ...prev.filter((m) => m.id !== ASSISTANT_STREAM_ID),
@@ -193,10 +204,11 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
           {
             id: generateId(),
             role: "assistant",
-            content: "Cleared your cart.",
+            content: reply,
             timestamp: new Date(),
           },
         ]);
+        callbacks.onAssistantComplete?.(reply);
         return true;
       }
 
@@ -353,6 +365,9 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
             onDone: () => {
               setIsLoading(false);
               setStreamStatus(undefined);
+              if (textBuffer.trim()) {
+                callbacks.onAssistantComplete?.(textBuffer);
+              }
               updateSessionMessages(sessionId, (prev) =>
                 prev.map((m) =>
                   m.id === ASSISTANT_STREAM_ID

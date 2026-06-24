@@ -1,17 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import AppShell from "@/components/layout/AppShell";
-import Header from "@/components/layout/Header";
-import FloatingCartBar from "@/components/layout/FloatingCartBar";
-import CartDrawer from "@/components/cart/CartDrawer";
 import CheckoutWizard from "@/components/checkout/CheckoutWizard";
 import ProductModal from "@/components/products/ProductModal";
 import VariantSelector from "@/components/products/VariantSelector";
-import CategoryNav from "@/components/ui/CategoryNav";
 import ChatMessages from "./ChatMessages";
 import ChatInput from "./ChatInput";
-import ChatTabs from "./ChatTabs";
 import { useBackendHealth } from "@/lib/chat/useBackendHealth";
 import { useCategories } from "@/lib/chat/useCategories";
 import { useChatSession } from "@/lib/chat/useChatSession";
@@ -19,16 +13,18 @@ import { useChatStreaming } from "@/lib/chat/useChatStreaming";
 import { isCheckoutChip } from "@/lib/chat-intents";
 import { useCartStore } from "@/lib/cart-store";
 import type { ChatMessage, Product } from "@/lib/types";
-import { generateId, hasVariants, mergeProductUpdates } from "@/lib/utils";
+import { generateId, hasVariants, mergeProductUpdates, stripJsonFromDisplay } from "@/lib/utils";
+import { useSpeechInput } from "@/lib/voice/useSpeechInput";
+import { useVoicePlayback } from "@/lib/voice/useVoicePlayback";
 
 export default function ChatInterface() {
-  const [cartOpen, setCartOpen] = useState(false);
-  const [browseOpen, setBrowseOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutKey, setCheckoutKey] = useState(0);
   const [modalProduct, setModalProduct] = useState<Product | null>(null);
   const [variantProduct, setVariantProduct] = useState<Product | null>(null);
   const [cartToast, setCartToast] = useState<string | null>(null);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const { backendOk, markHealthy } = useBackendHealth();
   const { categories, loading: categoriesLoading } = useCategories();
@@ -40,23 +36,41 @@ export default function ChatInterface() {
     updateSessionMessages,
     maybeSetSessionTitle,
     handleNewChat,
-    handleSwitchTab,
   } = useChatSession();
 
+  const { isSpeaking, speak, stopSpeaking } = useVoicePlayback();
+  const {
+    isListening,
+    isTranscribing,
+    startListening,
+    stopListening,
+  } = useSpeechInput();
+
   const openCheckout = useCallback(() => {
-    setCartOpen(false);
     setCheckoutKey((k) => k + 1);
     setCheckoutOpen(true);
   }, []);
+
+  const handleAssistantComplete = useCallback(
+    (text: string) => {
+      if (!voiceMode) return;
+      const spoken = stripJsonFromDisplay(text).trim();
+      if (!spoken) return;
+      void speak(spoken).catch(() => {
+        setVoiceError("Could not play speech. Check ElevenLabs settings.");
+      });
+    },
+    [voiceMode, speak]
+  );
 
   const { isLoading, streamStatus, sendMessage, abortStream } = useChatStreaming({
     onOpenCheckout: openCheckout,
     onCartToast: setCartToast,
     markHealthy,
+    onAssistantComplete: handleAssistantComplete,
   });
 
   const mode = useCartStore((s) => s.mode);
-  const activeCategory = useCartStore((s) => s.activeCategory);
   const setActiveCategory = useCartStore((s) => s.setActiveCategory);
   const items = useCartStore((s) => s.items);
   const addItem = useCartStore((s) => s.addItem);
@@ -67,15 +81,22 @@ export default function ChatInterface() {
     return () => clearTimeout(t);
   }, [cartToast]);
 
+  useEffect(() => {
+    if (!voiceError) return;
+    const t = setTimeout(() => setVoiceError(null), 4000);
+    return () => clearTimeout(t);
+  }, [voiceError]);
+
   const handleSend = useCallback(
     (text: string) => {
       if (!activeSessionId) return;
+      stopSpeaking();
       void sendMessage(text, activeSessionId, {
         onTitleFromFirstMessage: (t) =>
           maybeSetSessionTitle(activeSessionId, t),
       });
     },
-    [activeSessionId, sendMessage, maybeSetSessionTitle]
+    [activeSessionId, sendMessage, maybeSetSessionTitle, stopSpeaking]
   );
 
   const handleCategorySelect = useCallback(
@@ -104,16 +125,31 @@ export default function ChatInterface() {
     }
   };
 
-  const handleCheckoutViaChat = () => {
-    setCartOpen(false);
-    setCheckoutOpen(false);
-    const summary = items
-      .map((i) => `${i.quantity}x ${i.product.name} (${i.product.id})`)
-      .join(", ");
-    handleSend(
-      `I'd like to checkout. My cart has: ${summary}. Please help me with delivery details and payment.`
-    );
-  };
+  const handleMicClick = useCallback(async () => {
+    setVoiceError(null);
+    if (isListening) {
+      try {
+        const transcript = await stopListening();
+        handleSend(transcript);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Voice input failed";
+        setVoiceError(message);
+      }
+      return;
+    }
+
+    try {
+      stopSpeaking();
+      await startListening();
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Microphone access denied. Allow mic permission and try again.";
+      setVoiceError(message);
+    }
+  }, [isListening, stopListening, startListening, handleSend, stopSpeaking]);
 
   const handleOrderComplete = useCallback(
     ({
@@ -173,85 +209,72 @@ export default function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-bg relative">
-      <AppShell
-        browseOpen={browseOpen}
-        onBrowseOpenChange={setBrowseOpen}
+      <header className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-border bg-surface/80 backdrop-blur-sm">
+        <span className="text-sm font-semibold text-foreground">Kapruka</span>
+        <button
+          type="button"
+          onClick={() => handleNewChat(abortStream)}
+          className="text-xs px-3 py-1.5 rounded-full border border-border text-muted hover:text-foreground hover:border-primary/40 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
+        >
+          New chat
+        </button>
+      </header>
+
+      {!backendOk && (
+        <div
+          className="bg-warning/10 border-b border-warning/40 text-warning text-center text-sm py-2 px-4"
+          role="status"
+        >
+          Cannot reach the API. Run pnpm dev in frontend, or check GROQ_API_KEY
+          on Vercel.
+        </div>
+      )}
+
+      {cartToast && (
+        <div
+          className="absolute top-16 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-elevated border border-primary text-sm text-foreground animate-slide-in-right shadow-lg"
+          role="status"
+        >
+          {cartToast}
+        </div>
+      )}
+
+      <ChatMessages
+        messages={messages}
+        isLoading={isLoading}
+        status={streamStatus}
+        sessionContext={activeSession?.serverContext}
         categories={categories}
         categoriesLoading={categoriesLoading}
+        onOccasionSelect={handleSend}
         onCategorySelect={handleCategorySelect}
-        onNewChat={() => handleNewChat(abortStream)}
-        onCheckoutViaChat={handleCheckoutViaChat}
-        onOpenCheckoutWizard={openCheckout}
-      >
-        <Header
-          onCartClick={() => setCartOpen(true)}
-          onBrowseClick={() => setBrowseOpen(true)}
-        />
-        <ChatTabs
-          onNewChat={() => handleNewChat(abortStream)}
-          onSwitch={(id) => handleSwitchTab(id, abortStream)}
-        />
-        {!backendOk && (
-          <div
-            className="bg-warning/10 border-b border-warning/40 text-warning text-center text-sm py-2 px-4"
-            role="status"
-          >
-            Cannot reach the API. Run pnpm dev in frontend, or check GROQ_API_KEY
-            on Vercel.
-          </div>
-        )}
-        {cartToast && (
-          <div
-            className="absolute top-20 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-elevated border border-primary text-sm text-foreground animate-slide-in-right shadow-lg"
-            role="status"
-          >
-            {cartToast}
-          </div>
-        )}
-        <CategoryNav
-          categories={categories}
-          active={activeCategory}
-          onSelect={handleCategorySelect}
-          loading={categoriesLoading}
-        />
-        <ChatMessages
-          messages={messages}
-          isLoading={isLoading}
-          status={streamStatus}
-          sessionContext={activeSession?.serverContext}
-          categories={categories}
-          categoriesLoading={categoriesLoading}
-          onOccasionSelect={handleSend}
-          onCategorySelect={handleCategorySelect}
-          onView={setModalProduct}
-          onAdd={handleAddProduct}
-          onSendChip={(chip) => {
-            if (isCheckoutChip(chip)) {
-              openCheckout();
-              return;
-            }
-            handleSend(chip);
-          }}
-          onProductsAppend={handleProductsAppend}
-        />
-        <FloatingCartBar onOpenCart={() => setCartOpen(true)} />
-        <ChatInput
-          onSend={handleSend}
-          onOpenCheckout={openCheckout}
-          disabled={isLoading}
-          conversationState={conversationState}
-        />
-      </AppShell>
-
-      <CartDrawer
-        open={cartOpen}
-        onClose={() => setCartOpen(false)}
-        onCheckout={handleCheckoutViaChat}
-        onOpenWizard={() => {
-          setCartOpen(false);
-          openCheckout();
+        onView={setModalProduct}
+        onAdd={handleAddProduct}
+        onSendChip={(chip) => {
+          if (isCheckoutChip(chip)) {
+            openCheckout();
+            return;
+          }
+          handleSend(chip);
         }}
+        onProductsAppend={handleProductsAppend}
       />
+
+      <ChatInput
+        onSend={handleSend}
+        onOpenCheckout={openCheckout}
+        disabled={isLoading || isTranscribing}
+        conversationState={conversationState}
+        voiceMode={voiceMode}
+        onVoiceModeChange={setVoiceMode}
+        isRecording={isListening}
+        isTranscribing={isTranscribing}
+        isSpeaking={isSpeaking}
+        voiceError={voiceError}
+        onMicClick={() => void handleMicClick()}
+        onStopSpeaking={stopSpeaking}
+      />
+
       <CheckoutWizard
         key={checkoutKey}
         open={checkoutOpen}

@@ -45,4 +45,21 @@ describe("ChatInput", () => {
     await user.click(screen.getByRole("button", { name: /open checkout/i }));
     expect(onOpenCheckout).toHaveBeenCalled();
   });
+
+  it("toggles voice mode", async () => {
+    const onVoiceModeChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ChatInput
+        onSend={vi.fn()}
+        conversationState="empty"
+        voiceMode={false}
+        onVoiceModeChange={onVoiceModeChange}
+      />
+    );
+    await user.click(
+      screen.getByRole("button", { name: /enable spoken replies/i })
+    );
+    expect(onVoiceModeChange).toHaveBeenCalledWith(true);
+  });
 });

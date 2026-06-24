@@ -49,11 +49,78 @@ function SendIcon() {
   );
 }
 
+function MicIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" x2="12" y1="19" y2="22" />
+    </svg>
+  );
+}
+
+function SpeakerIcon({ muted }: { muted?: boolean }) {
+  if (muted) {
+    return (
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+        <line x1="23" x2="17" y1="9" y2="15" />
+        <line x1="17" x2="23" y1="9" y2="15" />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+    </svg>
+  );
+}
+
 interface ChatInputProps {
   onSend: (message: string) => void;
   onOpenCheckout?: () => void;
   disabled?: boolean;
   conversationState?: ConversationState;
+  voiceMode?: boolean;
+  onVoiceModeChange?: (enabled: boolean) => void;
+  isRecording?: boolean;
+  isTranscribing?: boolean;
+  isSpeaking?: boolean;
+  voiceError?: string | null;
+  onMicClick?: () => void;
+  onStopSpeaking?: () => void;
 }
 
 export default function ChatInput({
@@ -61,6 +128,14 @@ export default function ChatInput({
   onOpenCheckout,
   disabled,
   conversationState = "empty",
+  voiceMode = false,
+  onVoiceModeChange,
+  isRecording = false,
+  isTranscribing = false,
+  isSpeaking = false,
+  voiceError,
+  onMicClick,
+  onStopSpeaking,
 }: ChatInputProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -113,9 +188,42 @@ export default function ChatInput({
     onSend(msg);
   };
 
+  const voiceStatus = isTranscribing
+    ? "Processing…"
+    : isRecording
+      ? "Listening… tap mic when done"
+      : isSpeaking
+        ? "Speaking…"
+        : null;
+
   return (
     <div className="shrink-0 border-t border-border bg-surface/95 backdrop-blur-sm px-3 sm:px-4 py-3">
       <div className="w-full max-w-3xl lg:max-w-4xl mx-auto">
+        {(voiceStatus || voiceError) && (
+          <div className="mb-2 flex items-center justify-between gap-2 text-xs">
+            <span
+              className={
+                voiceError
+                  ? "text-warning"
+                  : isRecording
+                    ? "text-red-400"
+                    : "text-muted"
+              }
+              role="status"
+            >
+              {voiceError ?? voiceStatus}
+            </span>
+            {isSpeaking && onStopSpeaking && (
+              <button
+                type="button"
+                onClick={onStopSpeaking}
+                className="text-xs text-muted hover:text-foreground underline"
+              >
+                Stop
+              </button>
+            )}
+          </div>
+        )}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-2.5 pb-1">
           {hintChips.map((chip) => (
             <button
@@ -130,7 +238,22 @@ export default function ChatInput({
             </button>
           ))}
         </div>
-        <div className="flex gap-2.5 items-end">
+        <div className="flex gap-2 items-end">
+          {onVoiceModeChange && (
+            <button
+              type="button"
+              onClick={() => onVoiceModeChange(!voiceMode)}
+              className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center border transition-all focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+                voiceMode
+                  ? "bg-primary/15 border-primary text-primary"
+                  : "bg-elevated border-border text-muted hover:text-foreground"
+              }`}
+              aria-label={voiceMode ? "Disable spoken replies" : "Enable spoken replies"}
+              aria-pressed={voiceMode}
+            >
+              <SpeakerIcon muted={!voiceMode} />
+            </button>
+          )}
           <textarea
             ref={textareaRef}
             value={text}
@@ -142,11 +265,27 @@ export default function ChatInput({
             placeholder="What are you looking for today? / අද ඔයාට ඕන දෙය මොකක්ද?"
             className="flex-1 resize-none rounded-2xl border border-border bg-elevated text-foreground placeholder:text-muted px-4 py-3.5 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 disabled:opacity-50 min-h-[52px] max-h-24 transition-shadow"
           />
+          {onMicClick && (
+            <button
+              type="button"
+              onClick={onMicClick}
+              disabled={(disabled || isTranscribing) && !isRecording}
+              className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center border transition-all focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-40 ${
+                isRecording
+                  ? "bg-red-500 border-red-500 text-white animate-pulse"
+                  : "bg-elevated border-border text-muted hover:text-foreground hover:border-primary/40"
+              }`}
+              aria-label={isRecording ? "Stop recording and send" : "Start voice input"}
+              aria-pressed={isRecording}
+            >
+              <MicIcon />
+            </button>
+          )}
           <button
             type="button"
             onClick={handleSend}
             disabled={disabled || !text.trim()}
-            className="shrink-0 w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-40 hover:bg-primary-hover active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="shrink-0 w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-40 hover:bg-primary-hover active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-primary/30"
             aria-label="Send message"
           >
             <SendIcon />

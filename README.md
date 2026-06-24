@@ -1,13 +1,13 @@
 # Kapruka — Next.js (UI + API)
 
-Single Next.js app: chat UI and `/api/*` routes (Groq + Kapruka MCP). Deploy to **Vercel** with root directory `frontend`.
+Single Next.js app: full-screen chat UI with optional ElevenLabs voice, plus `/api/*` routes (Groq + Kapruka MCP). Deploy to **Vercel** with root directory `frontend`.
 
 ## Local development
 
 ```bash
 pnpm install
 cp .env.example .env.local
-# Add GROQ_API_KEY to .env.local
+# Add GROQ_API_KEY and ElevenLabs keys to .env.local
 pnpm dev
 ```
 
@@ -36,7 +36,18 @@ Do **not** set `NEXT_PUBLIC_BACKEND_URL` unless you still run the legacy Express
 | `GROQ_MODEL_FAST` | No | Fast model override |
 | `GROQ_MODEL_STRONG` | No | Strong model override |
 | `MCP_ENDPOINT` | No | Kapruka MCP endpoint |
+| `ELEVENLABS_API_KEY` | For voice | ElevenLabs API key (server-only) |
+| `ELEVENLABS_VOICE_ID` | For voice | Voice ID for spoken assistant replies |
+| `ELEVENLABS_MODEL_ID` | No | TTS model (default `eleven_multilingual_v2`) |
 | `NEXT_PUBLIC_BACKEND_URL` | No | Only for legacy Express backend |
+
+## Voice
+
+- **Mic button** — tap to start listening, tap again to stop and send (uses browser speech recognition in Chrome/Edge/Safari; no ElevenLabs key needed for input)
+- **Speaker toggle** — when on, assistant replies are spoken aloud (ElevenLabs TTS when configured; falls back to browser speech if ElevenLabs is unavailable)
+- Text input always works alongside voice
+- Mic requires HTTPS or `localhost` and browser microphone permission
+- If ElevenLabs returns a 401 (e.g. free tier disabled), voice input still works via the browser; only spoken replies may use the browser voice instead
 
 ## Deploy to Vercel (Hobby)
 
@@ -45,6 +56,7 @@ Do **not** set `NEXT_PUBLIC_BACKEND_URL` unless you still run the legacy Express
    - `GROQ_API_KEY` (required)
    - `GROQ_MODEL_FAST`, `GROQ_MODEL_STRONG` (optional)
    - `MCP_ENDPOINT` (optional)
+   - `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` (for voice)
 3. Deploy.
 
 **Hobby limits:** `/api/chat` has `maxDuration: 10` seconds. Browse/search uses a fast-path without Groq when possible. Complex checkout flows may timeout on free tier — use the in-app **Checkout wizard** (`/api/order/create`) for reliable pay links without the full Groq tool loop.
@@ -70,6 +82,8 @@ Do **not** set `NEXT_PUBLIC_BACKEND_URL` unless you still run the legacy Express
 | POST | `/api/order/create` |
 | POST | `/api/order/track` |
 | GET/POST | `/api/users/chat-history` |
+| POST | `/api/voice/stt` |
+| POST | `/api/voice/tts` |
 
 ## Legacy Express backend
 
