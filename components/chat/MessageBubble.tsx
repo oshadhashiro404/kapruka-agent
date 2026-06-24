@@ -91,10 +91,6 @@ export default function MessageBubble({
       <div className="flex justify-start gap-2.5 items-start">
         <BotAvatar />
         <div className="max-w-[85%] sm:max-w-[75%] bg-chat-bot border border-border text-foreground rounded-2xl rounded-bl-sm px-4 py-3.5">
-          <span className="text-xs font-medium text-muted block mb-1.5">
-            Kapruka shopping buddy
-          </span>
-
           {displayContent && (
             <p
               className={`text-[15px] leading-relaxed whitespace-pre-wrap ${
