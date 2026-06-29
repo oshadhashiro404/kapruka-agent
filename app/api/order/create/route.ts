@@ -56,7 +56,10 @@ export async function POST(req: Request): Promise<Response> {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Order creation failed";
-    const status = message.toLowerCase().includes("rate") ? 429 : 502;
+    const isRateLimit =
+      message.toLowerCase().includes("rate limit") ||
+      message.toLowerCase().includes("too many requests");
+    const status = isRateLimit ? 429 : 400;
     return Response.json({ error: message }, { status });
   }
 }
