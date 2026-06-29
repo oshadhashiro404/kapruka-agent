@@ -47,4 +47,36 @@ describe("parseKaprukaTrackResult", () => {
     expect(result.order_number).toBe("VPAY827982BA");
     expect(result.status).toBe("Processing");
   });
+
+  it("parses Kapruka markdown heading/table style response", () => {
+    const md = `## Order \`VPAY827982BA\` — Delivered
+
+| | |
+|---|---|
+| Total | {'value': '26060', 'currency': 'LKR'} |
+| Payment | 3645 |
+
+**Delivering to**
+- MS. GAYATHRI FERNANDO
+
+**Progress**
+- JUN 23, 2026 4:40 PM — Order Confirmed and Awaiting preparation
+- JUN 24, 2026 6:00 PM — Delivered
+`;
+
+    const result = parseKaprukaTrackResult(md, "VPAY827982BA");
+    expect(result.order_number).toBe("VPAY827982BA");
+    expect(result.status).toBe("Delivered");
+    expect(result.recipient).toMatch(/GAYATHRI/i);
+    expect(result.delivery_progress?.length).toBeGreaterThan(0);
+  });
+
+  it("throws meaningful Kapruka errors for invalid tracking", () => {
+    expect(() =>
+      parseKaprukaTrackResult(
+        "Error (not_found): We couldn't find this order number",
+        "BAD123"
+      )
+    ).toThrow(/couldn't find this order/i);
+  });
 });

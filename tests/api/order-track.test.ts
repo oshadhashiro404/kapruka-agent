@@ -42,7 +42,7 @@ describe("POST /api/order/track", () => {
       new Request("http://localhost/api/order/track", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_number: "VPAY827982BA" }),
+        body: JSON.stringify({ order_number: "vpay827982ba" }),
       })
     );
     expect(res.status).toBe(200);

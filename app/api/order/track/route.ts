@@ -25,7 +25,8 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   try {
-    const tracking = await trackOrder(parsed.data.order_number);
+    const normalizedOrderNumber = parsed.data.order_number.trim().toUpperCase();
+    const tracking = await trackOrder(normalizedOrderNumber);
     return Response.json({ tracking });
   } catch (err) {
     const message =

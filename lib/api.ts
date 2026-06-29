@@ -162,10 +162,11 @@ export async function createOrder(params: {
 export async function trackOrder(
   orderNumber: string
 ): Promise<OrderTracking> {
+  const normalizedOrderNumber = orderNumber.trim().toUpperCase();
   const res = await fetch(`${getApiBase()}/api/order/track`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ order_number: orderNumber }),
+    body: JSON.stringify({ order_number: normalizedOrderNumber }),
   });
   if (!res.ok) {
     const msg = await parseResponseError(res);

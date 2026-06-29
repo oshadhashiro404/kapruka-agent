@@ -34,4 +34,12 @@ describe("parseKaprukaOrderResult", () => {
     expect(result.order_id).toBeTruthy();
     expect(result.pay_url).toContain("pay/link123");
   });
+
+  it("throws meaningful Kapruka validation errors", () => {
+    expect(() =>
+      parseKaprukaOrderResult(
+        "Error (date_not_deliverable): We've scheduled your delivery for tomorrow"
+      )
+    ).toThrow(/scheduled your delivery/i);
+  });
 });

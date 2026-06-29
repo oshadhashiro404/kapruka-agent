@@ -360,6 +360,40 @@ export async function callMcpTool(
 	return parseToolResult(result);
 }
 
+function normalizeKaprukaErrorMessage(text: string): string {
+	return text
+		.replace(/^Error executing tool[^:]+:\s*/i, '')
+		.replace(/^Error\s*\([^)]+\):\s*/i, '')
+		.replace(/^Error:\s*/i, '')
+		.trim();
+}
+
+function extractKaprukaErrorMessage(raw: unknown): string | null {
+	if (typeof raw === 'string') {
+		const trimmed = raw.trim();
+		if (/^Error\b/i.test(trimmed) || /^Failed\b/i.test(trimmed)) {
+			return normalizeKaprukaErrorMessage(trimmed);
+		}
+		return null;
+	}
+	if (!raw || typeof raw !== 'object') return null;
+	const obj = raw as Record<string, unknown>;
+	const direct = obj.error ?? obj.errMsg ?? obj.message;
+	if (typeof direct === 'string' && direct.trim()) {
+		return normalizeKaprukaErrorMessage(direct);
+	}
+	if (obj.error && typeof obj.error === 'object') {
+		const nested = obj.error as Record<string, unknown>;
+		if (typeof nested.message === 'string' && nested.message.trim()) {
+			return normalizeKaprukaErrorMessage(nested.message);
+		}
+	}
+	if (typeof obj.result === 'string') {
+		return extractKaprukaErrorMessage(obj.result);
+	}
+	return null;
+}
+
 /** MCP returns tool output in content[] — markdown or JSON text */
 function parseToolResult(result: unknown): unknown {
 	if (result == null) return result;
@@ -372,8 +406,16 @@ function parseToolResult(result: unknown): unknown {
 
 	if (r.structuredContent !== undefined) {
 		const sc = r.structuredContent as { result?: string };
+		const scError = extractKaprukaErrorMessage(sc.result ?? r.structuredContent);
+		if (r.isError || scError) {
+			throw formatMcpError(scError ?? 'Kapruka tool execution failed');
+		}
 		if (typeof sc.result === 'string') {
-			return sc.result;
+			try {
+				return JSON.parse(sc.result);
+			} catch {
+				return sc.result;
+			}
 		}
 		return r.structuredContent;
 	}
@@ -385,12 +427,9 @@ function parseToolResult(result: unknown): unknown {
 		if (texts.length === 0) return result;
 
 		const combined = texts.join('\n');
-
-		if (r.isError || combined.includes('Error executing tool')) {
-			throw formatMcpError(
-				combined.replace(/^Error executing tool[^:]+:\s*/i, '').trim() ||
-					combined,
-			);
+		const contentError = extractKaprukaErrorMessage(combined);
+		if (r.isError || combined.includes('Error executing tool') || contentError) {
+			throw formatMcpError(contentError ?? normalizeKaprukaErrorMessage(combined));
 		}
 
 		try {
@@ -399,6 +438,9 @@ function parseToolResult(result: unknown): unknown {
 			return combined;
 		}
 	}
+
+	const topLevelError = extractKaprukaErrorMessage(result);
+	if (topLevelError) throw formatMcpError(topLevelError);
 
 	return result;
 }
@@ -777,6 +819,11 @@ export interface CreateOrderInput {
 
 /** Parse kapruka_create_order markdown / mixed MCP responses */
 export function parseKaprukaOrderResult(raw: unknown): OrderCreatedResult {
+	const extractedError = extractKaprukaErrorMessage(raw);
+	if (extractedError) {
+		throw new Error(extractedError);
+	}
+
 	if (typeof raw === 'string') {
 		const fromMd = parseOrderMarkdown(raw);
 		if (fromMd) return fromMd;
@@ -951,8 +998,11 @@ export async function createOrderFlat(params: {
 export async function trackOrder(
 	order_number: string,
 ): Promise<OrderTrackResult> {
-	const raw = await callMcpTool('kapruka_track_order', { order_number });
-	return parseKaprukaTrackResult(raw, order_number);
+	const normalizedOrderNumber = order_number.trim().toUpperCase();
+	const raw = await callMcpTool('kapruka_track_order', {
+		order_number: normalizedOrderNumber,
+	});
+	return parseKaprukaTrackResult(raw, normalizedOrderNumber);
 }
 
 /** Parse kapruka_track_order markdown / mixed MCP responses */
@@ -960,6 +1010,11 @@ export function parseKaprukaTrackResult(
 	raw: unknown,
 	orderNumber: string,
 ): OrderTrackResult {
+	const extractedError = extractKaprukaErrorMessage(raw);
+	if (extractedError) {
+		throw new Error(extractedError);
+	}
+
 	const fallback: OrderTrackResult = {
 		order_number: orderNumber,
 		status: 'Unknown',
@@ -1070,30 +1125,56 @@ function parseTrackMarkdown(
 	text: string,
 	orderNumber: string,
 ): OrderTrackResult | null {
-	const status =
-		text.match(/\*\*Status\*\*:\s*([^\n]+)/i)?.[1]?.trim() ??
-		text.match(/status[:\s]+([^\n]+)/i)?.[1]?.trim();
+	const clean = (v: string): string =>
+		v
+			.replace(/\*\*/g, '')
+			.replace(/`/g, '')
+			.replace(/\s+/g, ' ')
+			.trim();
 
-	const recipient =
+	const headingMatch = text.match(
+		/##\s*Order\s*`?([A-Za-z0-9_-]+)`?\s*[—-]\s*([^\n|]+)/i,
+	);
+	const headingOrder = headingMatch?.[1]?.trim();
+	const headingStatus = headingMatch?.[2]?.trim();
+
+	const status = clean(
+		headingStatus ??
+			text.match(/\*\*Status\*\*:\s*([^\n]+)/i)?.[1]?.trim() ??
+			text.match(/status[:\s]+([^\n]+)/i)?.[1]?.trim() ??
+			'',
+	);
+
+	const recipient = clean(
 		text.match(/\*\*Recipient\*\*:\s*([^\n]+)/i)?.[1]?.trim() ??
-		text.match(/recipient[:\s]+([^\n]+)/i)?.[1]?.trim();
+			text.match(/recipient[:\s]+([^\n]+)/i)?.[1]?.trim() ??
+			text.match(/\*\*Delivering to\*\*[\s\S]*?[-*]\s*([^\n<]+)/i)?.[1]?.trim() ??
+			'',
+	);
 
 	if (!status) return null;
 
-	const progressLines = [...text.matchAll(/[-*]\s*([^\n—-]+)(?:\s*[—-]\s*([^\n]+))?/g)];
-	const delivery_progress = progressLines
-		.map((m) => {
-			const stepStatus = m[1]?.trim();
-			const timestamp = m[2]?.trim();
-			if (!stepStatus || /status|recipient|order/i.test(stepStatus)) return null;
-			return timestamp
-				? { status: stepStatus, timestamp }
-				: { status: stepStatus };
+	const progressSection = text.match(/\*\*Progress\*\*([\s\S]*)/i)?.[1] ?? text;
+	const delivery_progress = progressSection
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter((line) => /^[-*]\s+/.test(line))
+		.map((line) => line.replace(/^[-*]\s+/, '').trim())
+		.map((line) => {
+			const parts = line.split(/\s+[—-]\s+/);
+			if (parts.length < 2) return { status: clean(line) };
+			const timestamp = clean(parts[0]);
+			const stepStatus = clean(parts.slice(1).join(' — '));
+			return stepStatus ? { status: stepStatus, timestamp } : null;
 		})
-		.filter((s): s is { status: string; timestamp?: string } => s !== null);
+		.filter((step): step is { status: string; timestamp?: string } => {
+			if (!step) return false;
+			if (!step.status) return false;
+			return !/delivering to|recipient|order\s+\|/i.test(step.status);
+		});
 
 	return {
-		order_number: orderNumber,
+		order_number: headingOrder ?? orderNumber,
 		status,
 		...(recipient ? { recipient } : {}),
 		...(delivery_progress.length > 0 ? { delivery_progress } : {}),

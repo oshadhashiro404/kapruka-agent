@@ -362,14 +362,28 @@ export default function CheckoutWizard({
       clearCart();
     } catch (e) {
       const raw = e instanceof Error ? e.message : "Could not create order";
+      const lower = raw.toLowerCase();
+      // Delivery slots are date-sensitive; nudge user back to date step when unavailable.
+      if (
+        lower.includes("date_not_deliverable") ||
+        lower.includes("today’s slots") ||
+        lower.includes("scheduled your delivery for tomorrow")
+      ) {
+        setStep("delivery");
+      }
       // Provide a helpful tip when Kapruka can't generate a payment link
-      const isPayLinkIssue = raw.toLowerCase().includes("payment link") || raw.toLowerCase().includes("pay_url");
+      const isPayLinkIssue =
+        lower.includes("payment link") ||
+        lower.includes("pay_url") ||
+        lower.includes("checkout link");
+      const friendly =
+        raw.length < 350
+          ? raw
+          : "Could not generate a payment link. Please verify all details and try again.";
       setError(
         isPayLinkIssue
-          ? `${raw}\n\nTip: Make sure your phone number is in 07X format and your address is complete, then try again.`
-          : raw.length < 300
-          ? raw
-          : "Could not generate a payment link. Please verify all details and try again."
+          ? `${friendly}\n\nTip: Make sure your phone number is in 07X format, use a complete address, and choose an available delivery date.`
+          : friendly
       );
     } finally {
       setSubmitting(false);
