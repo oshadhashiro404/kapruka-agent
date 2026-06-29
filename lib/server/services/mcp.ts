@@ -829,6 +829,10 @@ export function parseKaprukaOrderResult(raw: unknown): OrderCreatedResult {
 		if (fromMd) return fromMd;
 	}
 
+	// Log exactly what Kapruka returned so we can debug the format
+	// eslint-disable-next-line no-console
+	console.error('[kapruka_create_order] could not parse response:', JSON.stringify(raw).slice(0, 1000));
+
 	throw new Error(
 		'I could not generate a payment link from Kapruka right now. Please ensure all delivery details (Address, City, Phone) are complete and try again, or contact Kapruka support.',
 	);
@@ -903,13 +907,12 @@ export async function createOrder(
 
 	const raw = await callMcpTool('kapruka_create_order', payload);
 
+	logger.info({ raw: typeof raw === 'string' ? raw.slice(0, 500) : JSON.stringify(raw).slice(0, 500) }, 'kapruka_create_order raw response');
+
 	try {
 		return parseKaprukaOrderResult(raw);
 	} catch (err) {
 		logger.warn({ raw, err }, 'createOrder parse failed');
-		if (err instanceof Error && !err.message.includes('payment link')) {
-			throw err;
-		}
 		throw err;
 	}
 }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createOrder } from "@/lib/server/services/mcp";
+import logger from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,14 +39,28 @@ export async function POST(req: Request): Promise<Response> {
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
+    logger.warn({ issues: parsed.error.issues }, "order/create validation failed");
     return Response.json(
       { error: "Invalid request", details: parsed.error.flatten() },
       { status: 400 }
     );
   }
 
+  logger.info(
+    {
+      cart: parsed.data.cart,
+      recipient: { name: parsed.data.recipient.name, phone: parsed.data.recipient.phone },
+      delivery: parsed.data.delivery,
+    },
+    "order/create attempting"
+  );
+
   try {
     const result = await createOrder(parsed.data);
+    logger.info(
+      { order_id: result.order_id, has_pay_url: Boolean(result.pay_url) },
+      "order/create success"
+    );
     return Response.json({
       order_id: result.order_id,
       pay_url: result.pay_url,
@@ -56,6 +71,7 @@ export async function POST(req: Request): Promise<Response> {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Order creation failed";
+    logger.error({ errMsg: message, payload: parsed.data }, "order/create MCP error");
     const isRateLimit =
       message.toLowerCase().includes("rate limit") ||
       message.toLowerCase().includes("too many requests");
