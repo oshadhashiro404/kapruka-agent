@@ -1,22 +1,22 @@
 @import 'tailwindcss';
 
 :root {
-	--bg-base: #09090b;
-	--bg-surface: #121214;
-	--bg-elevated: #18181b;
-	--border: #27272a;
-	--text-primary: #fafafa;
-	--text-muted: #a1a1aa;
-	--accent: #e4e4e7;
-	--accent-hover: #ffffff;
-	--accent-soft: rgba(228, 228, 231, 0.1);
+	--bg-base: #0f172a;
+	--bg-surface: #1e293b;
+	--bg-elevated: rgba(30, 41, 59, 0.4);
+	--border: rgba(255, 255, 255, 0.08);
+	--text-primary: #f8fafc;
+	--text-muted: #94a3b8;
+	--accent: #14b8a6;
+	--accent-hover: #2dd4bf;
+	--accent-soft: rgba(20, 184, 166, 0.15);
 	--success: #10b981;
 	--warning: #f59e0b;
 	--danger: #ef4444;
-	--pay-bg: #09090b;
-	--chat-user-bg: #27272a;
-	--chat-bot-bg: #121214;
-	--chat-glow: rgba(255, 255, 255, 0.05);
+	--pay-bg: #0f172a;
+	--chat-user-bg: #0ea5e9;
+	--chat-bot-bg: rgba(30, 41, 59, 0.6);
+	--chat-glow: rgba(20, 184, 166, 0.3);
 }
 
 @theme inline {
@@ -56,11 +56,15 @@
 }
 
 @keyframes fade-in-up {
-	from {
+	0% {
 		opacity: 0;
-		transform: translateY(8px) scale(0.97);
+		transform: translateY(12px) scale(0.95);
 	}
-	to {
+	60% {
+		opacity: 1;
+		transform: translateY(-2px) scale(1.02);
+	}
+	100% {
 		opacity: 1;
 		transform: translateY(0) scale(1);
 	}

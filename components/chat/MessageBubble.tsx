@@ -3,6 +3,7 @@
 import DeliveryCard from "@/components/delivery/DeliveryCard";
 import PerishableWarning from "@/components/delivery/PerishableWarning";
 import PayButton from "@/components/checkout/PayButton";
+import OrderTrackingCard from "@/components/orders/OrderTrackingCard";
 import ProductCarousel from "@/components/products/ProductCarousel";
 import type { ChatMessage, Product, SessionContext } from "@/lib/types";
 import { stripJsonFromDisplay } from "@/lib/utils";
@@ -23,7 +24,7 @@ function isSinhala(text: string): boolean {
 function BotAvatar() {
   return (
     <span
-      className="inline-flex w-8 h-8 rounded-full bg-primary/10 border border-border items-center justify-center shrink-0"
+      className="inline-flex w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500/20 to-teal-500/20 border border-teal-500/30 items-center justify-center shrink-0 shadow-[0_0_10px_rgba(20,184,166,0.2)]"
       aria-hidden
     >
       <svg
@@ -71,7 +72,7 @@ export default function MessageBubble({
         role="article"
         aria-label="Your message"
       >
-        <div className="max-w-[85%] sm:max-w-[75%] bg-chat-user text-white rounded-2xl rounded-br-sm px-4 py-3 shadow-sm">
+        <div className="max-w-[85%] sm:max-w-[75%] bg-gradient-to-br from-cyan-500 to-teal-600 text-white rounded-2xl rounded-br-sm px-4 py-3 shadow-md border border-white/10">
           {displayContent && (
             <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
               {displayContent}
@@ -90,7 +91,7 @@ export default function MessageBubble({
     >
       <div className="flex justify-start gap-2.5 items-start">
         <BotAvatar />
-        <div className="max-w-[85%] sm:max-w-[75%] bg-chat-bot border border-border text-foreground rounded-2xl rounded-bl-sm px-4 py-3.5">
+        <div className="max-w-[85%] sm:max-w-[75%] bg-chat-bot backdrop-blur-md border border-white/10 shadow-sm text-foreground rounded-2xl rounded-bl-sm px-4 py-3.5">
           {displayContent && (
             <p
               className={`text-[15px] leading-relaxed whitespace-pre-wrap ${
@@ -108,7 +109,7 @@ export default function MessageBubble({
                   key={chip}
                   type="button"
                   onClick={() => onSendChip(chip)}
-                  className="px-3 py-1.5 rounded-full text-xs bg-elevated border border-border text-foreground hover:bg-primary hover:text-white hover:border-primary transition-colors animate-chip-pop focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="px-3 py-1.5 rounded-full text-xs bg-black/20 border border-white/10 text-foreground hover:bg-white/10 hover:border-white/30 transition-all duration-300 animate-chip-pop focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {chip}
                 </button>
@@ -138,6 +139,12 @@ export default function MessageBubble({
               orderId={message.order_id}
               expiresIn={message.expires_in ?? 3600}
             />
+          )}
+
+          {message.order_tracking && (
+            <div className="mt-3">
+              <OrderTrackingCard tracking={message.order_tracking} />
+            </div>
           )}
         </div>
       </div>

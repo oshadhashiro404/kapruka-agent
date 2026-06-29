@@ -53,6 +53,7 @@ export interface SessionContext {
   recipientPhone?: string;
   recipientAddress?: string;
   pendingDeliveryDate?: string;
+  lastOrderId?: string;
 }
 
 export interface Session {
@@ -119,6 +120,7 @@ export type SseEvent =
       messageEn: string;
       messageSi?: string;
     }
+  | { type: "order_tracking"; tracking: OrderTrackResult }
   | { type: "session_context"; context: SessionContext }
   | { type: "error"; message: string }
   | { type: "done" };
@@ -133,8 +135,9 @@ export interface OrderCreatedResult {
 }
 
 export interface OrderTrackResult {
+  order_number: string;
   status: string;
   recipient?: string;
-  items?: unknown[];
+  items?: Array<{ name?: string; quantity?: number }>;
   delivery_progress?: Array<{ status: string; timestamp?: string }>;
 }

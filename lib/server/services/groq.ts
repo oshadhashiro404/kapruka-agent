@@ -11,6 +11,7 @@ import {
 import {
   buildIntentReply,
   classifyIntent,
+  extractOrderNumber,
   shouldFastPathSearch,
   type Intent,
 } from "./intent-classifier";
@@ -30,6 +31,7 @@ import {
   getProduct,
   isValidProduct,
   parseKaprukaSearchMarkdown,
+  trackOrder,
 } from "./mcp";
 import { patchSessionContext } from "./session";
 import {
@@ -41,6 +43,7 @@ import {
 } from "../vercel-config";
 import type {
   DeliveryQuote,
+  OrderTrackResult,
   Product,
   Session,
   SseEvent,
@@ -106,6 +109,7 @@ function buildUserContext(session: Session, message: string): string {
   if (ctx.lastSearchQuery) known.push(`last search: ${ctx.lastSearchQuery}`);
   if (ctx.lastProducts?.length)
     known.push(`recent product IDs: ${ctx.lastProducts.join(", ")}`);
+  if (ctx.lastOrderId) known.push(`last order ID: ${ctx.lastOrderId}`);
 
   if (known.length > 0) {
     parts.push(`\n[Known context: ${known.join("; ")}]`);
@@ -271,6 +275,7 @@ function updateContextFromTool(
   if (toolName === "kapruka_create_order") {
     const r = args.recipient as { name?: string; phone?: string } | undefined;
     const d = args.delivery as { address?: string; date?: string; city?: string } | undefined;
+    const order = result as { order_id?: string } | undefined;
     patchSessionContext(session, {
       recipientName: r?.name ?? (args.recipient_name as string),
       recipientPhone: r?.phone ?? (args.recipient_phone as string),
@@ -278,6 +283,7 @@ function updateContextFromTool(
         d?.address ?? (args.delivery_address as string),
       deliveryCity: d?.city ?? (args.city_code as string),
       pendingDeliveryDate: d?.date ?? (args.delivery_date as string),
+      ...(order?.order_id ? { lastOrderId: order.order_id } : {}),
     });
   }
 }
@@ -375,12 +381,21 @@ async function emitStructuredSideEffects(
   if (toolName === "kapruka_create_order") {
     const order = result as { order_id: string; pay_url: string };
     if (order?.pay_url && order?.order_id) {
+      patchSessionContext(session, { lastOrderId: order.order_id });
       emit({
         type: "order_created",
         pay_url: order.pay_url,
         order_id: order.order_id,
         expires_in: 3600,
       });
+    }
+    return;
+  }
+
+  if (toolName === "kapruka_track_order") {
+    const tracking = result as OrderTrackResult;
+    if (tracking?.status && tracking?.order_number) {
+      emit({ type: "order_tracking", tracking });
     }
   }
 }
@@ -689,6 +704,54 @@ async function tryDeliveryQuote(
   }
 }
 
+function buildTrackSummary(tracking: OrderTrackResult): string {
+  const parts = [
+    `Here's the latest on order ${tracking.order_number} — status: ${tracking.status}.`,
+  ];
+  if (tracking.recipient) {
+    parts.push(`It's headed to ${tracking.recipient}.`);
+  }
+  if (tracking.delivery_progress?.length) {
+    const latest = tracking.delivery_progress[tracking.delivery_progress.length - 1];
+    parts.push(`Latest update: ${latest.status}${latest.timestamp ? ` (${latest.timestamp})` : ""}.`);
+  }
+  return parts.join(" ");
+}
+
+/** Track order via MCP without Groq when intent or order number is clear */
+async function tryTrackOrderFastPath(
+  session: Session,
+  userMessage: string,
+  intent: Intent,
+  emit: SseEmitter
+): Promise<string | null> {
+  const hasTrackIntent = intent.type === "track";
+  const orderFromMessage =
+    intent.extractedOrderNumber ?? extractOrderNumber(userMessage);
+  const orderNumber = orderFromMessage ?? session.context?.lastOrderId;
+
+  if (!hasTrackIntent && !orderFromMessage) return null;
+
+  if (!orderNumber) {
+    emit({
+      type: "chips",
+      items: ["VPAY827982BA (demo)", "I'll type my number"],
+    });
+    return "Sure machan — what's your order number? You can paste it here, or try our demo order.";
+  }
+
+  try {
+    emit({ type: "status", message: "Looking up your order..." });
+    const tracking = await trackOrder(orderNumber);
+    emit({ type: "order_tracking", tracking });
+    return buildTrackSummary(tracking);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Could not track that order";
+    return `${message} — double-check the order number and try again.`;
+  }
+}
+
 /** MCP search fallback without Groq */
 async function directMcpSearchFallback(
   session: Session,
@@ -931,6 +994,21 @@ export async function runKapruwaChat(
     }
     emit({ type: "session_context", context: session.context });
     return { reply: deliveryReply, sessionId: session.id };
+  }
+
+  const trackReply = await tryTrackOrderFastPath(
+    session,
+    userMessage,
+    intent,
+    emit
+  );
+  if (trackReply) {
+    emit({ type: "text", content: trackReply });
+    if (session.cart.length > 0) {
+      emit({ type: "cart_update", cart: session.cart });
+    }
+    emit({ type: "session_context", context: session.context });
+    return { reply: trackReply, sessionId: session.id };
   }
 
   const conciergeReply = await tryConciergePath(

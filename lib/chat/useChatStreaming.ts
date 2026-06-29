@@ -324,6 +324,12 @@ export function useChatStreaming(callbacks: ChatStreamingCallbacks) {
                 expires_in: expiresIn,
               }));
             },
+            onOrderTracking: (tracking) => {
+              updateAssistant(sessionId, (m) => ({
+                ...m,
+                order_tracking: tracking,
+              }));
+            },
             onPerishableWarning: (message, alternatives) => {
               updateAssistant(sessionId, (m) => ({
                 ...m,

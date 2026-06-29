@@ -25,10 +25,17 @@ export function deriveConversationState(
   if (!lastAssistant) {
     return messages.length === 0 ? "empty" : hasProducts ? "products" : "empty";
   }
-  if (lastAssistant.pay_url) return "ordered";
+  if (lastAssistant.pay_url || lastAssistant.order_tracking) return "ordered";
   if (lastAssistant.delivery_quote) return "delivery";
   if (lastAssistant.products?.length) return "products";
   return "empty";
+}
+
+export function getLastOrderId(messages: ChatMessage[]): string | undefined {
+  for (const m of [...messages].reverse()) {
+    if (m.role === "assistant" && m.order_id) return m.order_id;
+  }
+  return undefined;
 }
 
 export function useChatSession() {
@@ -39,6 +46,7 @@ export function useChatSession() {
   const switchSession = useChatStore((s) => s.switchSession);
   const updateSessionMessages = useChatStore((s) => s.updateSessionMessages);
   const setSessionTitle = useChatStore((s) => s.setSessionTitle);
+  const setServerContext = useChatStore((s) => s.setServerContext);
   const syncSessionId = useCartStore((s) => s.syncSessionId);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
@@ -137,6 +145,7 @@ export function useChatSession() {
     updatedAt,
     updateSessionMessages,
     setSessionTitle,
+    setServerContext,
     maybeSetSessionTitle,
     handleNewChat,
     handleSwitchTab,

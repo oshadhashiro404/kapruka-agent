@@ -11,8 +11,6 @@ const CHIPS_BY_STATE: Record<
   empty: [
     { emoji: "🎁", en: "Birthday gift", msg: "I want a birthday gift" },
     { emoji: "🌸", en: "Flowers", msg: "Show me flowers" },
-    { emoji: "📱", en: "Electronics", msg: "Show me electronics" },
-    { emoji: "📦", en: "Track order", msg: "Track my order" },
   ],
   products: [
     { emoji: "➕", en: "Add first one", msg: "Add the first one to my cart" },
@@ -113,6 +111,7 @@ interface ChatInputProps {
   onOpenCheckout?: () => void;
   disabled?: boolean;
   conversationState?: ConversationState;
+  lastOrderId?: string;
   voiceMode?: boolean;
   onVoiceModeChange?: (enabled: boolean) => void;
   isRecording?: boolean;
@@ -128,6 +127,7 @@ export default function ChatInput({
   onOpenCheckout,
   disabled,
   conversationState = "empty",
+  lastOrderId,
   voiceMode = false,
   onVoiceModeChange,
   isRecording = false,
@@ -141,6 +141,15 @@ export default function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const itemCount = useCartStore((s) => s.itemCount());
   const hintChips = [...CHIPS_BY_STATE[conversationState]];
+  if (conversationState === "ordered" && lastOrderId) {
+    const trackIdx = hintChips.findIndex((c) => c.en === "Track order");
+    if (trackIdx >= 0) {
+      hintChips[trackIdx] = {
+        ...hintChips[trackIdx],
+        msg: `Track order ${lastOrderId}`,
+      };
+    }
+  }
   if (
     itemCount > 0 &&
     onOpenCheckout &&
@@ -185,6 +194,10 @@ export default function ChatInput({
       onOpenCheckout();
       return;
     }
+    if (/VPAY827982BA\s*\(demo\)/i.test(msg)) {
+      onSend("Track order VPAY827982BA");
+      return;
+    }
     onSend(msg);
   };
 
@@ -197,8 +210,8 @@ export default function ChatInput({
         : null;
 
   return (
-    <div className="shrink-0 border-t border-border bg-surface/95 backdrop-blur-sm px-3 sm:px-4 py-3">
-      <div className="w-full max-w-3xl lg:max-w-4xl mx-auto">
+    <div className="shrink-0 px-3 sm:px-4 py-4 pb-6 bg-gradient-to-t from-bg via-bg/80 to-transparent">
+      <div className="w-full max-w-3xl lg:max-w-4xl mx-auto bg-surface/70 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-3xl p-3 relative z-10">
         {(voiceStatus || voiceError) && (
           <div className="mb-2 flex items-center justify-between gap-2 text-xs">
             <span
@@ -231,7 +244,7 @@ export default function ChatInput({
               type="button"
               disabled={disabled}
               onClick={() => handleChip(chip.msg)}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-elevated border border-border text-muted hover:border-chat-glow/50 hover:text-foreground hover:bg-chat-bot transition-all duration-200 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-black/20 border border-white/5 text-muted hover:border-white/20 hover:text-foreground hover:bg-white/5 transition-all duration-300 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <span aria-hidden>{chip.emoji}</span>
               <span>{chip.en}</span>
@@ -262,8 +275,8 @@ export default function ChatInput({
             onInput={onInput}
             disabled={disabled}
             rows={1}
-            placeholder="What are you looking for today? / අද ඔයාට ඕන දෙය මොකක්ද?"
-            className="flex-1 resize-none rounded-2xl border border-border bg-elevated text-foreground placeholder:text-muted px-4 py-3.5 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 disabled:opacity-50 min-h-[52px] max-h-24 transition-shadow"
+            placeholder="Who are we shopping for today? Just tell me what you need..."
+            className="flex-1 resize-none rounded-2xl border border-white/5 bg-black/20 text-foreground placeholder:text-muted px-4 py-3.5 text-base focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 disabled:opacity-50 min-h-[52px] max-h-24 transition-all"
           />
           {onMicClick && (
             <button

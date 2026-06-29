@@ -4,6 +4,7 @@ import type {
 	CartItem,
 	ChatMode,
 	DeliveryQuote,
+	OrderTracking,
 	Product,
 	SessionContext,
 	SseEvent,
@@ -15,6 +16,7 @@ export interface StreamChatCallbacks {
 	onDeliveryQuote: (quote: DeliveryQuote) => void;
 	onOpenCheckoutWizard?: () => void;
 	onOrderCreated: (payUrl: string, orderId: string, expiresIn: number) => void;
+	onOrderTracking?: (tracking: OrderTracking) => void;
 	onPerishableWarning: (message: string, alternatives: Product[]) => void;
 	onCartUpdate: (cart: CartItem[]) => void;
 	onStatus?: (message: string) => void;
@@ -45,6 +47,9 @@ function dispatchEvent(event: SseEvent, callbacks: StreamChatCallbacks): void {
 			break;
 		case 'order_created':
 			callbacks.onOrderCreated(event.pay_url, event.order_id, event.expires_in);
+			break;
+		case 'order_tracking':
+			callbacks.onOrderTracking?.(event.tracking);
 			break;
 		case 'perishable_warning':
 			callbacks.onPerishableWarning(event.message, event.alternatives);

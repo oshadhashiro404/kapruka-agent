@@ -81,7 +81,15 @@ export default function OccasionGrid({
         ))}
       </div>
 
-      <div className="mt-8 max-w-md mx-auto w-full">
+      <div className="mt-8 max-w-md mx-auto w-full space-y-3">
+        <button
+          type="button"
+          onClick={() => onSelect("Track order VPAY827982BA")}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary/10 border border-primary/30 text-primary text-sm font-medium hover:bg-primary/15 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
+        >
+          <span aria-hidden>📦</span>
+          Try demo order (VPAY827982BA)
+        </button>
         <OrderTracker compact />
       </div>
     </div>

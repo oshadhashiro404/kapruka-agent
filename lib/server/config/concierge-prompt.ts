@@ -23,9 +23,9 @@ Given the user message and optional cart/context, return:
 }
 
 Rules:
-- searchQuery must be specific (e.g. "red roses bouquet apology" not just "gift")
+- searchQuery must be highly specific and tailored to Kapruka's catalog (e.g. "red roses bouquet apology", "chocolate birthday cake", "mens perfume" instead of generic "gift")
 - For breakup/apology → roses bouquet, mustHave roses/flowers, avoid electronics, advice hand-deliver
-- For vague "gift for mom" only → skipSearch true, ask ONE question about item type + budget
+- For vague requests (e.g. "gift for mom") → skipSearch true, ask ONE question about item type + budget
 - mustHave/avoid guide product filtering — be precise for the emotion
 - emotionalTone: e.g. "sincere apology, comforting" or "joyful birthday surprise"
 - chips: include "Add first", "Add second" if multiple products likely; "Add a gift card" for gift occasions

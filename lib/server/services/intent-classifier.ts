@@ -29,6 +29,7 @@ export interface Intent {
   confidence: number;
   extractedBudget?: number;
   extractedCity?: string;
+  extractedOrderNumber?: string;
   extractedKeywords: string[];
   extractedCategory?: string;
   isNegation: boolean;
@@ -52,6 +53,13 @@ const CHECKOUT =
 
 const TRACK =
   /\b(track|where is|status of)\s+(my\s+)?(order|package|delivery)\b/i;
+
+const ORDER_NUMBER = /\b([A-Z]{2,6}\d+[A-Z0-9]*)\b/i;
+
+export function extractOrderNumber(text: string): string | undefined {
+  const m = text.match(ORDER_NUMBER);
+  return m?.[1]?.toUpperCase();
+}
 
 const DELIVERY =
   /\b(deliver|delivery|ship)\s+(to|in)?\b|\bcan you deliver\b/i;
@@ -121,6 +129,7 @@ export function classifyIntent(
   const keywords = extractKeywords(context);
   const budget = parseBudgetLkr(context) ?? parseBudgetLkr(msg);
   const city = extractCity(msg) ?? extractCity(context);
+  const orderNumber = extractOrderNumber(msg);
   const category = parseCategoryBrowse(msg);
   const narrative = isNarrativeMessage(msg);
   const isNegation = NEGATION.test(msg) || /\bno\s+(flowers|cake|gift)/i.test(msg);
@@ -149,9 +158,9 @@ export function classifyIntent(
     };
   }
 
-  if (TRACK.test(msg)) {
+  if (TRACK.test(msg) || orderNumber) {
     type = "track";
-    confidence = 0.9;
+    confidence = orderNumber ? 0.95 : 0.9;
   } else if (CHECKOUT.test(msg)) {
     type = "checkout";
     confidence = 0.92;
@@ -214,6 +223,7 @@ export function classifyIntent(
     confidence: Math.min(confidence, 1),
     extractedBudget: budget,
     extractedCity: city,
+    extractedOrderNumber: orderNumber,
     extractedKeywords: keywords,
     extractedCategory: category,
     isNegation,

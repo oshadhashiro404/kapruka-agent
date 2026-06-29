@@ -49,6 +49,7 @@ export interface ChatMessage {
   expires_in?: number;
   perishable_warning?: string;
   perishable_alternatives?: Product[];
+  order_tracking?: OrderTracking;
   timestamp: Date | string;
 }
 
@@ -67,6 +68,7 @@ export interface SessionContext {
   recipientPhone?: string;
   recipientAddress?: string;
   pendingDeliveryDate?: string;
+  lastOrderId?: string;
 }
 
 export interface ChatSession {
@@ -102,6 +104,7 @@ export type SseEvent =
       messageEn: string;
       messageSi?: string;
     }
+  | { type: "order_tracking"; tracking: OrderTracking }
   | { type: "session_context"; context: SessionContext }
   | { type: "error"; message: string }
   | { type: "done" };
@@ -136,8 +139,9 @@ export interface OccasionTile {
 }
 
 export interface OrderTracking {
+  order_number: string;
   status: string;
   recipient?: string;
-  items?: unknown[];
+  items?: Array<{ name?: string; quantity?: number }>;
   delivery_progress?: Array<{ status: string; timestamp?: string }>;
 }

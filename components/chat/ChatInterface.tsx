@@ -8,7 +8,7 @@ import ChatMessages from "./ChatMessages";
 import ChatInput from "./ChatInput";
 import { useBackendHealth } from "@/lib/chat/useBackendHealth";
 import { useCategories } from "@/lib/chat/useCategories";
-import { useChatSession } from "@/lib/chat/useChatSession";
+import { useChatSession, getLastOrderId } from "@/lib/chat/useChatSession";
 import { useChatStreaming } from "@/lib/chat/useChatStreaming";
 import { isCheckoutChip } from "@/lib/chat-intents";
 import { useCartStore } from "@/lib/cart-store";
@@ -34,9 +34,11 @@ export default function ChatInterface() {
     messages,
     conversationState,
     updateSessionMessages,
+    setServerContext,
     maybeSetSessionTitle,
     handleNewChat,
   } = useChatSession();
+  const lastOrderId = getLastOrderId(messages);
 
   const { isSpeaking, speak, stopSpeaking } = useVoicePlayback();
   const {
@@ -142,6 +144,7 @@ export default function ChatInterface() {
     try {
       stopSpeaking();
       await startListening();
+      setVoiceMode(true);
     } catch (err) {
       const message =
         err instanceof Error
@@ -179,6 +182,7 @@ export default function ChatInterface() {
         pay_url: payUrl,
         order_id: orderId,
         expires_in: expiresIn,
+        chips: [`Track order ${orderId}`, "New search"],
         timestamp: new Date(),
       };
       updateSessionMessages(activeSessionId, (prev) => [
@@ -186,8 +190,12 @@ export default function ChatInterface() {
         userMsg,
         assistantMsg,
       ]);
+      setServerContext(activeSessionId, {
+        ...(activeSession?.serverContext ?? {}),
+        lastOrderId: orderId,
+      });
     },
-    [activeSessionId, updateSessionMessages]
+    [activeSessionId, activeSession?.serverContext, setServerContext, updateSessionMessages]
   );
 
   const handleProductsAppend = useCallback(
@@ -209,12 +217,12 @@ export default function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-bg relative">
-      <header className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-border bg-surface/80 backdrop-blur-sm">
-        <span className="text-sm font-semibold text-foreground">Kapruka</span>
+      <header className="shrink-0 z-20 flex items-center justify-between px-4 py-3 border-b border-white/5 bg-surface/50 backdrop-blur-xl shadow-sm">
+        <span className="text-sm font-semibold text-foreground bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent">Kapruka AI</span>
         <button
           type="button"
           onClick={() => handleNewChat(abortStream)}
-          className="text-xs px-3 py-1.5 rounded-full border border-border text-muted hover:text-foreground hover:border-primary/40 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="text-xs px-3 py-1.5 rounded-full border border-white/10 text-muted hover:text-foreground hover:border-primary/40 bg-black/20 transition-all focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
           New chat
         </button>
@@ -251,6 +259,10 @@ export default function ChatInterface() {
         onView={setModalProduct}
         onAdd={handleAddProduct}
         onSendChip={(chip) => {
+          if (/VPAY827982BA\s*\(demo\)/i.test(chip)) {
+            handleSend("Track order VPAY827982BA");
+            return;
+          }
           if (isCheckoutChip(chip)) {
             openCheckout();
             return;
@@ -265,6 +277,7 @@ export default function ChatInterface() {
         onOpenCheckout={openCheckout}
         disabled={isLoading || isTranscribing}
         conversationState={conversationState}
+        lastOrderId={lastOrderId}
         voiceMode={voiceMode}
         onVoiceModeChange={setVoiceMode}
         isRecording={isListening}

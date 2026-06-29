@@ -27,4 +27,27 @@ describe("MessageBubble", () => {
     );
     expect(screen.getByText(/colombo/i)).toBeInTheDocument();
   });
+
+  it("renders order tracking card", () => {
+    render(
+      <MessageBubble
+        message={{
+          id: "m2",
+          role: "assistant",
+          content: "Here's your order update.",
+          order_tracking: {
+            order_number: "VPAY827982BA",
+            status: "Shipped",
+            recipient: "Kamal",
+            delivery_progress: [{ status: "Shipped", timestamp: "Today" }],
+          },
+          timestamp: new Date(),
+        }}
+        onView={vi.fn()}
+        onAdd={vi.fn()}
+      />
+    );
+    expect(screen.getByText("VPAY827982BA")).toBeInTheDocument();
+    expect(screen.getAllByText("Shipped").length).toBeGreaterThan(0);
+  });
 });

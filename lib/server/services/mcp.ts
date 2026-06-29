@@ -830,7 +830,7 @@ export function parseKaprukaOrderResult(raw: unknown): OrderCreatedResult {
 	}
 
 	throw new Error(
-		'Could not get a payment link from Kapruka. Double-check delivery details and try again — or contact Kapruka support if this keeps happening.',
+		'I could not generate a payment link from Kapruka right now. Please ensure all delivery details (Address, City, Phone) are complete and try again, or contact Kapruka support.',
 	);
 }
 
@@ -949,7 +949,152 @@ export async function trackOrder(
 	order_number: string,
 ): Promise<OrderTrackResult> {
 	const raw = await callMcpTool('kapruka_track_order', { order_number });
-	return raw as OrderTrackResult;
+	return parseKaprukaTrackResult(raw, order_number);
+}
+
+/** Parse kapruka_track_order markdown / mixed MCP responses */
+export function parseKaprukaTrackResult(
+	raw: unknown,
+	orderNumber: string,
+): OrderTrackResult {
+	const fallback: OrderTrackResult = {
+		order_number: orderNumber,
+		status: 'Unknown',
+	};
+
+	if (typeof raw === 'string') {
+		const fromMd = parseTrackMarkdown(raw, orderNumber);
+		if (fromMd) return fromMd;
+		try {
+			return parseKaprukaTrackResult(JSON.parse(raw), orderNumber);
+		} catch {
+			return {
+				...fallback,
+				status: raw.trim().slice(0, 200) || fallback.status,
+			};
+		}
+	}
+
+	if (raw && typeof raw === 'object') {
+		const obj = raw as Record<string, unknown>;
+
+		if (typeof obj.result === 'string') {
+			return parseKaprukaTrackResult(obj.result, orderNumber);
+		}
+
+		const tracking = (obj.tracking as Record<string, unknown>) ?? obj;
+		const status = String(
+			tracking.status ?? tracking.order_status ?? tracking.state ?? '',
+		).trim();
+		const recipient = String(
+			tracking.recipient ?? tracking.recipient_name ?? '',
+		).trim();
+
+		const progressRaw = tracking.delivery_progress ?? tracking.progress;
+		const delivery_progress = normalizeDeliveryProgress(progressRaw);
+
+		const itemsRaw = tracking.items;
+		const items = normalizeTrackItems(itemsRaw);
+
+		if (status) {
+			return {
+				order_number: String(
+					tracking.order_number ?? tracking.order_id ?? orderNumber,
+				).trim(),
+				status,
+				...(recipient ? { recipient } : {}),
+				...(items.length > 0 ? { items } : {}),
+				...(delivery_progress.length > 0 ? { delivery_progress } : {}),
+			};
+		}
+
+		const fromMd = parseTrackMarkdown(JSON.stringify(obj), orderNumber);
+		if (fromMd) return fromMd;
+	}
+
+	return {
+		order_number: orderNumber,
+		status: typeof raw === 'object' && raw ? JSON.stringify(raw).slice(0, 200) : 'Tracking information unavailable.',
+	};
+}
+
+function normalizeDeliveryProgress(
+	raw: unknown,
+): Array<{ status: string; timestamp?: string }> {
+	if (!Array.isArray(raw)) return [];
+	return raw
+		.map((step) => {
+			if (typeof step === 'string') return { status: step };
+			if (step && typeof step === 'object') {
+				const s = step as Record<string, unknown>;
+				const status = String(s.status ?? s.label ?? s.step ?? '').trim();
+				const timestamp = String(s.timestamp ?? s.date ?? s.time ?? '').trim();
+				if (!status) return null;
+				return timestamp
+					? { status, timestamp }
+					: { status };
+			}
+			return null;
+		})
+		.filter((s): s is { status: string; timestamp?: string } => s !== null);
+}
+
+function normalizeTrackItems(
+	raw: unknown,
+): Array<{ name?: string; quantity?: number }> {
+	if (!Array.isArray(raw)) return [];
+	const items: Array<{ name?: string; quantity?: number }> = [];
+	for (const item of raw) {
+		if (typeof item === 'string') {
+			items.push({ name: item });
+			continue;
+		}
+		if (item && typeof item === 'object') {
+			const i = item as Record<string, unknown>;
+			const name = String(i.name ?? i.product_name ?? i.title ?? '').trim();
+			const qty = Number(i.quantity ?? i.qty);
+			if (!name) continue;
+			items.push({
+				name,
+				...(Number.isFinite(qty) && qty > 0 ? { quantity: qty } : {}),
+			});
+		}
+	}
+	return items;
+}
+
+function parseTrackMarkdown(
+	text: string,
+	orderNumber: string,
+): OrderTrackResult | null {
+	const status =
+		text.match(/\*\*Status\*\*:\s*([^\n]+)/i)?.[1]?.trim() ??
+		text.match(/status[:\s]+([^\n]+)/i)?.[1]?.trim();
+
+	const recipient =
+		text.match(/\*\*Recipient\*\*:\s*([^\n]+)/i)?.[1]?.trim() ??
+		text.match(/recipient[:\s]+([^\n]+)/i)?.[1]?.trim();
+
+	if (!status) return null;
+
+	const progressLines = [...text.matchAll(/[-*]\s*([^\n—-]+)(?:\s*[—-]\s*([^\n]+))?/g)];
+	const delivery_progress = progressLines
+		.map((m) => {
+			const stepStatus = m[1]?.trim();
+			const timestamp = m[2]?.trim();
+			if (!stepStatus || /status|recipient|order/i.test(stepStatus)) return null;
+			return timestamp
+				? { status: stepStatus, timestamp }
+				: { status: stepStatus };
+		})
+		.filter((s): s is { status: string; timestamp?: string } => s !== null);
+
+	return {
+		order_number: orderNumber,
+		status,
+		...(recipient ? { recipient } : {}),
+		...(delivery_progress.length > 0 ? { delivery_progress } : {}),
+	};
 }
 
 /** True when MCP session was established (no network call). */

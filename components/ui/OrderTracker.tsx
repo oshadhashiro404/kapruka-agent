@@ -1,15 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import OrderTrackingCard from "@/components/orders/OrderTrackingCard";
 import { trackOrder } from "@/lib/api";
 import type { OrderTracking } from "@/lib/types";
 
 interface OrderTrackerProps {
   compact?: boolean;
+  initialOrderNumber?: string;
 }
 
-export default function OrderTracker({ compact }: OrderTrackerProps) {
-  const [orderNumber, setOrderNumber] = useState("");
+export default function OrderTracker({
+  compact,
+  initialOrderNumber = "",
+}: OrderTrackerProps) {
+  const [orderNumber, setOrderNumber] = useState(initialOrderNumber);
   const [loading, setLoading] = useState(false);
   const [tracking, setTracking] = useState<OrderTracking | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +54,7 @@ export default function OrderTracker({ compact }: OrderTrackerProps) {
           value={orderNumber}
           onChange={(e) => setOrderNumber(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleTrack()}
-          placeholder="KAP-12345"
+          placeholder="e.g. VPAY827982BA"
           className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
         <button
@@ -63,28 +68,8 @@ export default function OrderTracker({ compact }: OrderTrackerProps) {
       </div>
       {error && <p className="text-danger text-xs mt-2">{error}</p>}
       {tracking && (
-        <div className="mt-3 text-xs sm:text-sm space-y-1 text-muted">
-          <p>
-            <span className="text-foreground font-medium">Status:</span>{" "}
-            {tracking.status}
-          </p>
-          {tracking.recipient && (
-            <p>
-              <span className="text-foreground font-medium">Recipient:</span>{" "}
-              {tracking.recipient}
-            </p>
-          )}
-          {tracking.delivery_progress &&
-            tracking.delivery_progress.length > 0 && (
-              <ul className="list-disc pl-4 pt-1">
-                {tracking.delivery_progress.map((step, i) => (
-                  <li key={i}>
-                    {step.status}
-                    {step.timestamp ? ` — ${step.timestamp}` : ""}
-                  </li>
-                ))}
-              </ul>
-            )}
+        <div className="mt-3">
+          <OrderTrackingCard tracking={tracking} compact />
         </div>
       )}
     </div>
